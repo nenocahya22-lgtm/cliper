@@ -1,0 +1,13 @@
+streamlit>=1.35.0
+yt-dlp>=2024.12.0
+requests>=2.31.0
+faster-whisper>=1.1.0
+playwright>=1.48.0
+onnxruntime==1.25.0
+
+# Install FFmpeg secara manual:
+# - Download dari https://ffmpeg.org/download.html
+# - Atau ffmpeg.exe sudah ada di folder ini
+#
+# Install Playwright browser:
+#   playwright install chromium

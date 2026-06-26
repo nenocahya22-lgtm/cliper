@@ -1,0 +1,41 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Output videos
+output/*.mp4
+output/*.json
+output/work_*/
+output/farm_*/
+
+# FFmpeg binaries
+ffmpeg.exe
+ffmpeg.zip
+ffmpeg-release.zip
+ffmpeg_bin/
+ffmpeg_extracted/
+
+# Queue data
+queue/queue.json
+queue/stats.json
+queue/schedule.json
+
+# Accounts (cookies)
+accounts/**/cookies.json
+
+# Logs
+server.log
+*.log
+
+# Streamlit
+.streamlit/
+
+# OS
+Thumbs.db
+.DS_Store
