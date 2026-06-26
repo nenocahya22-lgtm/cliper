@@ -128,9 +128,12 @@ class VideoDownloader:
         final = os.path.join(out, f"clip_{cid}.mp4")
         dur = ett - stt
         opts = _default_opts(
-            format="worstvideo[height<=360]+worstaudio/worst[height<=360]",
+            # Quality-first: do not force worstvideo. Use a safer upper bound
+            # closer to what opus-clip style tools often keep (typically 720p+ when available).
+            format="bestvideo[height<=1080][fps<=60]+bestaudio/best[height<=1080][fps<=60]",
             outtmpl=os.path.join(out, f"raw_{cid}.%(ext)s"),
             merge_output_format="mp4",
+
             external_downloader="ffmpeg",
             external_downloader_args={"ffmpeg": ["-ss", str(stt), "-t", str(dur)]},
         )
