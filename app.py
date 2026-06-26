@@ -617,24 +617,39 @@ def _page_process():
             url = st.session_state.get("vurl", "")
             if not url:
                 return
-            step("Downloading preview audio (max 10 menit)...", 0.1,
-                 "Hanya 10 menit pertama untuk analisis cepat")
-            audio, title, dur = VideoDownloader.download_audio(url, wd, max_dur=600)
-            if not audio or not Path(audio).exists():
-                return
-            res.audio_path = audio
+            step("Mendapatkan info video...", 0.05)
+            import yt_dlp
+            try:
+                with yt_dlp.YoutubeDL() as ydl:
+                    info = ydl.extract_info(url, download=False)
+            except: info = {}
+            title = info.get("title", "Unknown")
+            dur = info.get("duration", 0) or 0
             res.title = title
             res.duration = dur
-            step("Transcribing with Whisper (mode cepat)...", 0.3,
-                 f"Audio: {min(dur,600):.0f}s — ini yang paling lama")
-            text, wts = AudioTranscriber.transcribe(audio)
-            if text:
-                res.transcript = text
-                res.word_timestamps = wts
+
+            step("Mengunduh subtitle YouTube (instan)...", 0.15,
+                 "Auto-caption dari YouTube, tanpa Whisper")
+            sub_text = VideoDownloader.get_subtitle_text(url)
+            if sub_text:
+                res.transcript = sub_text
+                step(f"Transcript: {len(sub_text.split())} kata dari subtitle", 0.3)
+            else:
+                step("Download audio untuk transkripsi...", 0.2,
+                     "Subtitle tidak tersedia, fallback ke Whisper")
+                audio, _, _ = VideoDownloader.download_audio(url, wd, max_dur=600)
+                if audio and Path(audio).exists():
+                    res.audio_path = audio
+                    step("Transcribing with Whisper...", 0.35,
+                         "Ini yang paling lama — sabar ya")
+                    text, wts = AudioTranscriber.transcribe(audio)
+                    if text:
+                        res.transcript = text
+                        res.word_timestamps = wts
             step("Analyzing viral moments...", 0.6)
-            res.viral_moments = ViralMomentFinder.find_moments(res.transcript or "", dur, wts)
+            res.viral_moments = ViralMomentFinder.find_moments(res.transcript or "", dur, res.word_timestamps)
             step("Downloading video clip...", 0.8,
-                 "Mengunduh kualitas rendah dulu untuk preview")
+                 "Kualitas rendah untuk preview cepat")
             vp = VideoDownloader.download_video_clip(url, wd, 0, min(dur+5, 600))
             if vp:
                 res.video_path = vp

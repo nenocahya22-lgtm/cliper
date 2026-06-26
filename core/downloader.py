@@ -55,6 +55,41 @@ class VideoDownloader:
         return ""
 
     @staticmethod
+    def get_subtitle_text(url: str) -> str:
+        os.makedirs(script_dir, exist_ok=True)
+        import yt_dlp, re, json
+        try:
+            with yt_dlp.YoutubeDL(_default_opts()) as ydl:
+                info = ydl.extract_info(url, download=False)
+        except: return ""
+        for lang in ["id", "en", "a.en", "a.id", "a.en-US"]:
+            subs = info.get("subtitles", {}).get(lang, []) or info.get("automatic_captions", {}).get(lang, [])
+            for s in subs:
+                if s.get("ext") == "json3":
+                    import urllib.request
+                    try:
+                        resp = urllib.request.urlopen(s["url"], timeout=10)
+                        data = json.loads(resp.read().decode())
+                        words = []
+                        for ev in data.get("events", []):
+                            for seg in ev.get("segs", []):
+                                w = seg.get("utf8", "").strip()
+                                if w: words.append(w)
+                        return " ".join(words)
+                    except: pass
+                elif s.get("ext") in ("vtt", "srv1", "srv2", "srv3"):
+                    import urllib.request
+                    try:
+                        resp = urllib.request.urlopen(s["url"], timeout=10)
+                        text = resp.read().decode("utf-8", errors="replace")
+                        lines = re.findall(r'(?m)^([A-Za-z].*)$', text)
+                        clean = " ".join(l.strip() for l in lines if l.strip() and "-->" not in l and not l.startswith("WEBVTT"))
+                        clean = re.sub(r'<[^>]+>', '', clean).strip()
+                        if clean: return clean
+                    except: pass
+        return ""
+
+    @staticmethod
     def download_audio(url: str, out: str, max_dur: float = 600) -> Tuple[str, str, float]:
         os.makedirs(out, exist_ok=True)
         _cleanup_part_files(out)
