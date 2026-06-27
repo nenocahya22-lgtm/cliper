@@ -31,7 +31,10 @@ class Uploader:
         import warnings
         warnings.filterwarnings("ignore")
 
-        from playwright.sync_api import sync_playwright
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            raise Exception("Playwright tidak terinstall. Jalankan: playwright install chromium")
 
         PLATFORM_URLS = {
             "youtube": "https://www.youtube.com",
@@ -105,7 +108,10 @@ Tekan ENTER setelah login selesai...
         if not cookies:
             raise Exception("Login dulu! Jalankan: python farm.py --login youtube")
 
-        from playwright.sync_api import sync_playwright
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            raise Exception("Playwright tidak terinstall. Jalankan: playwright install chromium")
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=False)
             ctx = browser.new_context()
@@ -151,7 +157,10 @@ Tekan ENTER setelah login selesai...
         if not cookies:
             raise Exception("Login dulu! Jalankan: python farm.py --login tiktok")
 
-        from playwright.sync_api import sync_playwright
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            raise Exception("Playwright tidak terinstall. Jalankan: playwright install chromium")
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=False)
             ctx = browser.new_context()
@@ -180,7 +189,10 @@ Tekan ENTER setelah login selesai...
         if not cookies:
             raise Exception("Login dulu! Jalankan: python farm.py --login facebook")
 
-        from playwright.sync_api import sync_playwright
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            raise Exception("Playwright tidak terinstall. Jalankan: playwright install chromium")
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=False)
             ctx = browser.new_context()

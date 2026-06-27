@@ -17,8 +17,7 @@ from pathlib import Path
 
 warnings.filterwarnings("ignore")
 
-import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")
@@ -177,7 +176,10 @@ def watch_loop(max_daily: int = 10):
 
         time.sleep(10)
 
+import io
+
 def main():
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     parser = argparse.ArgumentParser(description="VideoClipse Farming Tool")
     parser.add_argument("url", nargs="?", help="Link video")
     parser.add_argument("--queue", action="store_true", help="Tambah ke antrian")
