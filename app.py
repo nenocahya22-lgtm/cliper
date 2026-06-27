@@ -847,7 +847,7 @@ def _account_status(platform):
             with open(cfile) as f:
                 c = json.load(f)
             return "connected", f"{len(c)} cookies"
-        except: return "error", "file error"
+        except Exception: return "error", "file error"
     return "disconnected", "not logged in"
 
 def _logo():
@@ -867,7 +867,7 @@ def _get_user():
             u = st.experimental_user
             if u.is_logged_in and u.email:
                 return {"id": u.email, "name": u.get("name", u.email), "email": u.email, "avatar": u.get("picture", "")}
-    except: pass
+    except Exception: pass
     if "user" in st.session_state and st.session_state.user:
         return st.session_state.user
     return None
@@ -1116,7 +1116,7 @@ def _page_process():
             try:
                 with yt_dlp.YoutubeDL(_default_opts()) as ydl:
                     info = ydl.extract_info(url, download=False)
-            except: info = {}
+            except Exception: info = {}
             title = info.get("title", "Unknown")
             dur = info.get("duration", 0) or 0
             res.title = title
