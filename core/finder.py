@@ -19,17 +19,58 @@ class ProcessingResult:
     output_path: str = ""; error: str = ""
 
 class ViralMomentFinder:
-    HOOK_KW = ["tahukah","coba lihat","perhatikan","bayangkan","tebak","rahasia","tips","wow",
+    # ── Viral Hook Keywords ─────────────────────────────────────
+    # HOOK: Pembuka yang bikin penasaran & engagement tinggi
+    HOOK_KW = [
+        "tahukah","coba lihat","perhatikan","bayangkan","tebak","rahasia","tips","wow",
         "gila","serius","nggak nyangka","ternyata","jangan sampai","penting","did you know",
-        "omg","bro","sis","guys","pernah gak sih","kalian tahu gak"]
-    CLIMAX_KW = ["tapi","namun","akhirnya","ternyata","tiba-tiba","luar biasa","gila","keren",
+        "omg","bro","guys","pernah gak sih","kalian tahu gak","stop scrolling","wait till",
+        "you won't believe","incredible","shocking","mind blowing","this is crazy",
+        "watch this","check this out","you need to see","this changes everything",
+        "the truth about","what happened next","i can't believe","this is why",
+        "the real reason","nobody tells you","the secret behind","how to actually",
+        "stop everything","this one trick","game changer","life hack","terbaru",
+        "heboh","viral banget","fyp","for you","must watch","don't skip","baru tau",
+        "ga nyangka","ini dia","nih","wajib tonton","auto","bikin merinding",
+        "bikin mewek","bikin ketawa","nggak nyangka","ngagetin","mengejutkan",
+        "kebanyakan orang","99% orang","hanya sedikit","the moment when"
+    ]
+
+    # KLIMAKS: Intensitas tinggi, plot twist, atau puncak emosi
+    CLIMAX_KW = [
+        "tapi","namun","akhirnya","ternyata","tiba-tiba","luar biasa","gila","keren",
         "amazing","paling","sangat","sekali","bikin ngakak","lucu","parah","gokil","wkwk",
-        "yang penting","intinya","pokoknya"]
-    CTA_KW = ["follow","ikuti","subscribe","subs","langganan","like","share","bagikan",
+        "yang penting","intinya","pokoknya","plot twist","the twist","what the",
+        "no way","for real","actually","the best part","here's the thing",
+        "this is where","and then","suddenly","out of nowhere","boom","wow",
+        "mind blowing","epic","legendary","insane","brilliant","genius",
+        "tak terduga","di luar dugaan","puncaknya","klimaksnya","momen paling",
+        "inti dari","yang bikin","sampai-sampai","bikin speechless","bikin merinding"
+    ]
+
+    # CTA: Ajakan berinteraksi di akhir video
+    CTA_KW = [
+        "follow","ikuti","subscribe","subs","langganan","like","share","bagikan",
         "komentar","simpan","jangan lupa","support","join","terima kasih","makasih",
-        "sampai jumpa","bye bye","assalamualaikum"]
-    EMOTIONAL = {"gila","keren","amazing","wow","luar biasa","mengejutkan","terbaik","lucu",
-        "ngakak","nangis","baper","semangat","motivasi","hebat","mantap","viral","parah","gokil"}
+        "sampai jumpa","bye bye","assalamualaikum","next video","stay tuned",
+        "turn on notifications","comment below","let me know","what do you think",
+        "drop a comment","hit that like","smash that like","see you next time",
+        "jangan lupa subscribe","komen di bawah","share ke teman","tag teman",
+        "save this video","bookmark this","follow for more","check out my",
+        "link in bio","link di deskripsi","sampe sini dulu","sekian dulu",
+        "salam kenal","jangan kemana-mana","tunggu video selanjutnya"
+    ]
+
+    # EMOSIONAL: Kata-kata dengan muatan emosi tinggi (viral potential)
+    EMOTIONAL = {
+        "gila","keren","amazing","wow","luar biasa","mengejutkan","terbaik","lucu",
+        "ngakak","nangis","baper","semangat","motivasi","hebat","mantap","viral","parah","gokil",
+        "brilliant","genius","incredible","shocking","epic","legendary","insane","mindblowing",
+        "speechless","merinding","mewek","haru","terharu","greget","menegangkan",
+        "fantastic","awesome","terbaik","terkeren","tergila","wonderful","magnificent",
+        "sakti","jago","expert","masterpiece","goosebumps","thrilling","heartwarming",
+        "kontroversial","debatable","unik","langka","rare","exclusive","rahasia umum"
+    }
 
     @staticmethod
     def find_moments(transcript: str, duration: float, word_ts: List[WordTimestamp],

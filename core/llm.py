@@ -60,24 +60,42 @@ Hashtag:"""
     return []
 
 def find_moments_with_llm(transcript: str, duration: float, model_name: str = None) -> list:
-    prompt = f"""Kamu adalah ahli editing video pendek (TikTok/Shorts/Reels).
-Analisis transkrip video berikut (total durasi {duration} detik) dan tentukan 3 momen paling viral.
-Momen harus berupa:
-1. HOOK (Pembukaan menarik, 0 - 15 detik pertama)
-2. KLIMAKS (Inti paling menarik/lucu/mengejutkan)
-3. CTA (Ajakan bertindak di akhir video)
+    prompt = f"""Kamu adalah ahli strategi konten viral untuk TikTok, YouTube Shorts, dan Instagram Reels.
+Tugasmu: analisis transkrip video ini (durasi {duration} detik) dan temukan 3-5 momen dengan POTENSI VIRAL TERTINGGI.
 
-Format output harus berupa JSON ARRAY murni berisi objek, tanpa teks penjelasan apa pun sebelum atau sesudah JSON!
-Contoh format output:
+Kriteria momen VIRAL:
+1. HOOK (0-20 detik pertama):
+   - Cari kalimat pembuka yang bikin penasaran, kontroversial, atau mengejutkan
+   - Pertanyaan retoris, fakta mengejutkan, pernyataan berani
+   - Kata-kata: 'tahukah', 'rahasia', 'jangan sampai', 'stop scrolling'
+   
+2. KLIMAKS / PLOT TWIST:
+   - Bagian paling intens, mengejutkan, atau emosional
+   - Momen 'plot twist', pengakuan mengejutkan, atau puncak cerita
+   - Kata-kata: 'tapi ternyata', 'akhirnya', 'tiba-tiba', 'luar biasa'
+   
+3. CTA (Ajakan Interaksi):
+   - Bagian akhir yang mengajak subscribe, like, comment, share
+   - Kalimat yang bikin orang mau klik follow
+
+4. MOMEN VIRAL LAINNYA (jika ada):
+   - Bagian lucu, relatable, atau kontroversial
+   - Kutipan yang bisa jadi 'sound viral'
+   - Momen emosional yang bikin baper/merinding
+
+🚨 FORMAT OUTPUT (WAJIB):
+Keluarkan ONLY JSON ARRAY. NO teks lain sebelum/sesudah JSON!
 [
-  {{"start_time": 0.0, "end_time": 15.0, "reason": "Hook pembuka tentang rahasia sukses", "category": "HOOK"}},
-  {{"start_time": 20.0, "end_time": 50.0, "reason": "Klimaks penjelasan cara kerja AI", "category": "KLIMAKS"}},
-  {{"start_time": 50.0, "end_time": 60.0, "reason": "Ajakan follow dan like", "category": "CTA"}}
+  {{"start_time": 0.0, "end_time": 15.0, "reason": "[jelaskan kenapa ini viral: hook kuat, bikin penasaran tentang rahasia sukses]", "category": "HOOK", "viral_score": 9}},
+  {{"start_time": 20.0, "end_time": 45.0, "reason": "[plot twist mengejutkan yang bikin speechless]", "category": "KLIMAKS", "viral_score": 10}},
+  {{"start_time": 50.0, "end_time": 60.0, "reason": "[ajakan subscribe dengan alasan kuat]", "category": "CTA", "viral_score": 7}}
 ]
 
-Batasan:
-- Waktu start_time dan end_time harus angka float/integer antara 0 dan {duration}.
-- start_time harus kurang dari end_time.
+RULES:
+- start_time dan end_time: angka float, 0 sampai {duration}
+- start_time HARUS < end_time
+- viral_score: 1-10 (10 = paling viral potential)
+- Durasi tiap momen: 10-60 detik (idealnya 15-45 detik)
 
 Transkrip:
 {transcript}
@@ -91,12 +109,22 @@ JSON Output:"""
         data = json.loads(json_str)
         moments = []
         for item in data:
+            score = item.get("viral_score", 7)
+            reason = str(item.get("reason", "Momen viral oleh AI"))
+            # Tambah skor ke reason untuk display
+            stars = "⭐" * max(1, min(5, int(score / 2)))
+            enriched_reason = f"{reason} [{stars}]"
             moments.append({
                 "start_time": float(item.get("start_time", 0)),
                 "end_time": float(item.get("end_time", 0)),
-                "reason": str(item.get("reason", "Momen viral oleh Llama AI")),
+                "reason": enriched_reason,
                 "category": str(item.get("category", "AUTO")).upper()
             })
+        # Sort by viral potential (highest score first)
+        try:
+            moments.sort(key=lambda x: -float(x.get("viral_score", 0)))
+        except:
+            pass
         return moments
     except Exception as e:
         print("[LLM ERROR] Gagal parse JSON momen:", e, "Result was:", result)

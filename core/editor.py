@@ -43,6 +43,17 @@ TEXT_ANIMATIONS = {
     "slide_down": "slide=t:0:1",
     "typewriter": "typewriter",
     "bounce": "bounce",
+    "shake": "shake",
+    "glitch_text": "glitch",
+}
+
+# ── New CapCut-like features ─────────────────────────────────
+CHROMA_KEY_COLORS = {
+    "Green (Hijau)": "0x00FF00",
+    "Blue (Biru)": "0x0000FF",
+    "Red (Merah)": "0xFF0000",
+    "White (Putih)": "0xFFFFFF",
+    "Custom": "custom",
 }
 
 class SubtitleGenerator:
@@ -89,6 +100,65 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         return out
 
 class VideoProcessor:
+    # ── New CapCut Feature Filters ────────────────────────────────
+    @staticmethod
+    def _reverse_filter(is_enabled: bool = False) -> str:
+        """Reverse clip (play backwards) - like CapCut reverse"""
+        if not is_enabled:
+            return ""
+        return "reverse"
+
+    @staticmethod
+    def _chroma_key_filter(color_hex: str, similarity: float = 0.4, blend: float = 0.1) -> str:
+        """Chroma key / Green screen effect - like CapCut chroma key"""
+        if not color_hex or color_hex == "custom":
+            return ""
+        # Convert hex to RGB for colorkey
+        try:
+            hex_str = color_hex.replace("0x", "")
+            r = int(hex_str[0:2], 16)
+            g = int(hex_str[2:4], 16)
+            b = int(hex_str[4:6], 16)
+            return f"colorkey=0x{r:02x}{g:02x}{b:02x}:{similarity}:{blend}"
+        except:
+            return ""
+
+    @staticmethod
+    def _ken_burns_filter(enable: bool = False, zoom_start: float = 1.0, zoom_end: float = 1.3,
+                          pan_x_start: float = 0, pan_x_end: float = 0,
+                          pan_y_start: float = 0, pan_y_end: float = 0,
+                          duration: float = 10, aspect_key: str = "Portrait 9:16 (Shorts/TikTok)") -> str:
+        """Ken Burns effect (pan & zoom) - like CapCut keyframe animation"""
+        if not enable:
+            return ""
+        # Dynamic resolution based on aspect ratio
+        preset = ASPECT_PRESETS.get(aspect_key, ASPECT_PRESETS["Portrait 9:16 (Shorts/TikTok)"])
+        tw, th = preset["w"], preset["h"]
+        zoom_rate = (zoom_end - zoom_start) / max(duration, 1)
+        pan_rate_x = (pan_x_end - pan_x_start) / max(duration, 1)
+        pan_rate_y = (pan_y_end - pan_y_start) / max(duration, 1)
+        return f"zoompan=z='{zoom_start}+{zoom_rate}*on':x='iw/2-(iw/zoom/2)+{pan_rate_x}*on':y='ih/2-(ih/zoom/2)+{pan_rate_y}*on':d={int(duration)}:s={tw}x{th}"
+
+    @staticmethod
+    def _blur_background_filter(preset: str = "none") -> str:
+        """Blur background effect - like CapCut blur"""
+        blur_map = {
+            "none": "",
+            "light": "boxblur=2:1",
+            "medium": "boxblur=5:2",
+            "heavy": "boxblur=10:3",
+            "gaussian": "gblur=sigma=5",
+            "pixelate": "pixelize=w=iw/20:h=ih/20",
+        }
+        return blur_map.get(preset, "")
+
+    @staticmethod
+    def _stabilize_filter(enable: bool = False, shakiness: int = 5, accuracy: int = 15) -> str:
+        """Video stabilization - like CapCut stabilize"""
+        if not enable:
+            return ""
+        return f"vidstabdetect=shakiness={shakiness}:accuracy={accuracy}:result=transforms.trf"
+
     @staticmethod
     def _crop_scale_filter(aspect_key: str) -> str:
         preset = ASPECT_PRESETS.get(aspect_key, ASPECT_PRESETS["Portrait 9:16 (Shorts/TikTok)"])
@@ -114,7 +184,18 @@ class VideoProcessor:
                      text_animation: str="none", bg_music: str="",
                      music_volume: float=0.3, pip_video: str="",
                      speed_ramp: str="none", glitch: bool=False,
-                     subtitle_animation: str="none") -> Tuple[bool, str]:
+                     subtitle_animation: str="none",
+                     # ── New CapCut Features ────────────────────────
+                     reverse: bool=False,
+                     chroma_key: str="",
+                     chroma_similarity: float=0.4,
+                     chroma_blend: float=0.1,
+                     ken_burns: bool=False,
+                     ken_zoom_start: float=1.0,
+                     ken_zoom_end: float=1.3,
+                     blur_bg: str="none",
+                     stabilize: bool=False,
+                     stabilize_shakiness: int=5) -> Tuple[bool, str]:
         if not Path(in_vid).exists(): return False, "File tidak ditemukan"
         if ett <= stt:
             r = subprocess.run([FFMPEG_PATH,"-v","error","-show_entries","format=duration",
@@ -195,6 +276,29 @@ class VideoProcessor:
             pip_w = int(ASPECT_PRESETS.get(aspect, {}).get("w", 1080) * 0.3)
             pip_h = int(ASPECT_PRESETS.get(aspect, {}).get("h", 1920) * 0.3)
             pip_filter = f",[pip]scale={pip_w}:{pip_h}[pip_scaled]"
+
+        # ── New CapCut Features ────────────────────────────────────
+        # Chroma key / Green screen
+        ck = VideoProcessor._chroma_key_filter(chroma_key, chroma_similarity, chroma_blend)
+        if ck:
+            flt.append(ck)
+
+        # Blur background
+        blr = VideoProcessor._blur_background_filter(blur_bg)
+        if blr:
+            flt.append(blr)
+
+        # Reverse clip
+        if reverse:
+            flt.append("reverse")
+            # Reverse audio too
+
+        # Ken Burns effect (pan & zoom) — fixed aspect-aware version
+        if ken_burns:
+            kb = VideoProcessor._ken_burns_filter(True, ken_zoom_start, ken_zoom_end,
+                0, 0, 0, 0, dur, aspect)
+            if kb:
+                flt.append(kb)
 
         # Build filter string
         filter_str = ",".join(flt)
