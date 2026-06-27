@@ -90,6 +90,9 @@ def _get_cached_css():
 
   /* ── Chamfer cut size ──────────────────────────── */
   --chamfer: 4px;
+
+  /* ── Sidebar toggle state ────────────────────── */
+  --sidebar-left: 0px;
 }
 
 /* ── Chamfered corner mixin ─────────────────────────────── */
@@ -755,12 +758,68 @@ small { font-size: 10px; color: var(--muted-indigo); }
 }
 
 /* ══════════════════════════════════════════════════════════
+   HAMBURGER MENU — Tiga garis ☰ toggle sidebar
+   ══════════════════════════════════════════════════════════ */
+.hamburger-wrap {
+  position: fixed;
+  top: 10px;
+  left: 10px;
+  z-index: 99999;
+}
+.hamburger-wrap .stButton > button {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  padding: 0 !important;
+  background: var(--carbon) !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 20px !important;
+  font-weight: 400 !important;
+  color: var(--on-carbon) !important;
+  clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
+  cursor: pointer !important;
+  line-height: 1 !important;
+}
+.hamburger-wrap .stButton > button:hover {
+  background: var(--carbon-soft) !important;
+}
+.hamburger-wrap .stButton > button:active {
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.3) !important;
+}
+
+/* Desktop: sembunyikan hamburger */
+@media (min-width: 721px) {
+  .hamburger-wrap { display: none !important; }
+}
+
+/* ══════════════════════════════════════════════════════════
+   SIDEBAR — Slide in/out via CSS variable
+   ══════════════════════════════════════════════════════════ */
+[data-testid="stSidebar"] {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+/* ══════════════════════════════════════════════════════════
    RESPONSIVE — Mobile Stack
    ══════════════════════════════════════════════════════════ */
 @media (max-width: 720px) {
+  /* Sembunyikan streamlit sidebar toggle bawaan, pake punya kita */
+  [data-testid="stSidebarCollapsedControl"] {
+    display: none !important;
+  }
   [data-testid="stSidebar"] {
-    min-width: 56px !important;
-    max-width: 56px !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    height: 100vh !important;
+    z-index: 99995 !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    min-width: var(--sidebar-width) !important;
+    max-width: var(--sidebar-width) !important;
   }
   [data-testid="stSidebar"] .stButton > button span:last-child { display: none; }
   .sidebar-logo-text, .sidebar-logo-sub,
@@ -861,7 +920,7 @@ def _init_state():
         "processing": False, "rendering": False,
         "step": 1, "src": "url", "page": "dashboard",
         "edit_queue_id": None, "clips_page": 1, "vurl": "", "farm_url": "",
-        "user": None,
+        "user": None, "sidebar_open": False,
     }
     for k, v in keys_default.items():
         if k not in st.session_state:
@@ -1746,6 +1805,42 @@ def main():
     st.markdown('<div class="main-container">', unsafe_allow_html=True)
     page_map.get(current_page, page_dashboard_router)()
     st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Hamburger Menu Icon + Sidebar Toggle ─────────────────────
+    st.markdown('<div class="hamburger-wrap">', unsafe_allow_html=True)
+    if st.button("☰", key="hamburger_btn", help="Buka/Tutup menu navigasi"):
+        st.session_state.sidebar_open = not st.session_state.get("sidebar_open", False)
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Auto-close sidebar on mobile setelah ganti halaman
+    sidebar_closed = not st.session_state.get("sidebar_open", False)
+    st.markdown(f"""
+    <style>
+    @media (max-width: 720px) {{
+      [data-testid="stSidebar"] {{
+        position: fixed !important;
+        top: 0 !important;
+        height: 100vh !important;
+        z-index: 99995 !important;
+        min-width: var(--sidebar-width) !important;
+        max-width: var(--sidebar-width) !important;
+        transition: left 0.3s ease, opacity 0.3s ease !important;
+        {'left: 0 !important; opacity: 1; pointer-events: all;' if not sidebar_closed else 'left: calc(-1 * var(--sidebar-width)) !important; opacity: 0; pointer-events: none;'}
+      }}
+      [data-testid="stSidebarCollapsedControl"] {{
+        display: none !important;
+      }}
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Auto close sidebar setelah navigasi (deteksi page change)
+    if "_last_page" not in st.session_state:
+        st.session_state._last_page = current_page
+    if st.session_state._last_page != current_page:
+        st.session_state._last_page = current_page
+        st.session_state.sidebar_open = False
 
 if __name__ == "__main__":
     main()
