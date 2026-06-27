@@ -113,6 +113,7 @@ html, body, [data-testid="stApp"], .stApp {
 [data-testid="stDecoration"] { display: none; }
 #MainMenu { visibility: hidden; }
 header { display: none !important; }
+[data-testid="stSidebarCollapsedControl"] { display: none !important; }
 .appview-container .main .block-container { padding: 0 !important; max-width: none !important; }
 
 /* ══════════════════════════════════════════════════════════
@@ -271,6 +272,7 @@ header { display: none !important; }
   max-width: var(--content-max);
   margin: 0 auto;
   padding: var(--sp-xxl) var(--sp-xl);
+  position: relative;
 }
 
 .page-header {
@@ -761,8 +763,8 @@ small { font-size: 10px; color: var(--muted-indigo); }
    HAMBURGER MENU — Tiga garis ☰ toggle sidebar
    ══════════════════════════════════════════════════════════ */
 .hamburger-wrap {
-  position: fixed;
-  top: 10px;
+  position: absolute;
+  top: 6px;
   left: 10px;
   z-index: 99999;
 }
@@ -791,10 +793,7 @@ small { font-size: 10px; color: var(--muted-indigo); }
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.3) !important;
 }
 
-/* Desktop: sembunyikan hamburger */
-@media (min-width: 721px) {
-  .hamburger-wrap { display: none !important; }
-}
+
 
 /* ══════════════════════════════════════════════════════════
    SIDEBAR — Slide in/out via CSS variable
@@ -906,7 +905,7 @@ def _login_page():
                 st.info("Configure SUPABASE_AUTH_CLIENT_ID for Google OAuth, or use Guest mode below.")
         else:
             st.info("Local mode: sign in as guest to continue.")
-        name = st.text_input("", placeholder="Your name (guest)", key="guest_name")
+        name = st.text_input("Nama", placeholder="Your name (guest)", key="guest_name", label_visibility="collapsed")
         if st.button("Continue as Guest", type="primary", use_container_width=True):
             st.session_state.user = {"id": name or "guest", "name": name or "Guest", "email": "", "avatar": ""}
             st.rerun()
@@ -1027,7 +1026,7 @@ def _page_input():
     st.markdown('<p class="page-sub">Paste a link or upload a file to create viral clips</p>', unsafe_allow_html=True)
     tab1, tab2, tab3 = st.tabs(["\U0001f517 Link", "\U0001f4c1 Upload", "\U0001f33e Farm"])
     with tab1:
-        url = st.text_input("", placeholder="https://youtube.com/...", key="vurl_input", label_visibility="collapsed")
+        url = st.text_input("Video URL", placeholder="https://youtube.com/...", key="vurl_input", label_visibility="collapsed")
         if url:
             st.session_state.vurl = url
             p = VideoDownloader.detect_platform(url)
@@ -1037,13 +1036,14 @@ def _page_input():
                 st.session_state.moment_mode = mode
                 if st.button("Download & Analyze", type="primary", use_container_width=True):
                     st.session_state.src = "url"
+                    st.session_state.page = "dashboard"
                     st.session_state.processing = True
                     st.session_state.step = 2
                     st.rerun()
             else:
                 st.markdown(f'<p style="color:var(--nintendo-red);font-size:11px;margin:4px 0;font-weight:700">Platform not supported</p>', unsafe_allow_html=True)
     with tab2:
-        up = st.file_uploader("", type=list(SUPPORTED_VIDEO_EXT), label_visibility="collapsed")
+        up = st.file_uploader("Upload Video", type=list(SUPPORTED_VIDEO_EXT), label_visibility="collapsed")
         if up:
             sz = len(up.getvalue()) / (1024*1024)
             st.markdown(f'<p style="color:var(--ink-soft);font-size:11px;margin:4px 0">{up.name} ({sz:.1f} MB)</p>', unsafe_allow_html=True)
@@ -1058,12 +1058,13 @@ def _page_input():
                 st.session_state.src = "local"
                 st.session_state.local_path = p
                 st.session_state.local_name = up.name
+                st.session_state.page = "dashboard"
                 st.session_state.processing = True
                 st.session_state.step = 2
                 st.rerun()
     with tab3:
         st.markdown('<p style="font-size:12px;color:var(--ink-soft);margin-bottom:var(--sp-lg)">One link \u2192 multiple clips \u2192 scheduled upload</p>', unsafe_allow_html=True)
-        furl = st.text_input("", placeholder="https://youtube.com/...", key="farm_url_input", label_visibility="collapsed")
+        furl = st.text_input("Farm URL", placeholder="https://youtube.com/...", key="farm_url_input", label_visibility="collapsed")
         if furl:
             st.session_state.farm_url = furl
         cols = st.columns(3)
@@ -1260,7 +1261,7 @@ def _page_editor():
         speed_ramp = tr_col2.selectbox("Speed Ramp", ["none","ease_in","ease_out"], index=0)
         st.markdown('<p style="font-size:11px;font-weight:700;margin:var(--sp-sm) 0 var(--sp-xs);text-transform:uppercase;letter-spacing:0.3px;color:var(--ink-soft)">Transition (opening)</p>', unsafe_allow_html=True)
         trans_keys = list(TRANSITIONS.keys())
-        trans = st.selectbox("", trans_keys, index=0, label_visibility="collapsed")
+        trans = st.selectbox("Transition", trans_keys, index=0, label_visibility="collapsed")
         st.markdown('<p style="font-size:11px;font-weight:700;margin:var(--sp-sm) 0 var(--sp-xs);text-transform:uppercase;letter-spacing:0.3px;color:var(--ink-soft)">Fade</p>', unsafe_allow_html=True)
         fi_c, fo_c = st.columns(2)
         fi = fi_c.slider("Fade In", 0.0, 2.0, 0.5, 0.1)
@@ -1760,7 +1761,7 @@ def main():
                 st.rerun()
         st.markdown('<div class="sidebar-model"><label>Ollama Model</label></div>', unsafe_allow_html=True)
         models = ["llama3.2:latest", "qwen2.5-coder:1.5b", "Custom"]
-        sel_model = st.selectbox("", models, index=0, key="ollama_model_select", label_visibility="collapsed")
+        sel_model = st.selectbox("Model", models, index=0, key="ollama_model_select", label_visibility="collapsed")
         if sel_model == "Custom":
             custom_model = st.text_input("Nama Model Custom", value="llama3.2:latest", key="custom_ollama_model", label_visibility="collapsed")
             st.session_state.ollama_model = custom_model
@@ -1803,8 +1804,6 @@ def main():
         "stats": page_stats,
     }
     st.markdown('<div class="main-container">', unsafe_allow_html=True)
-    page_map.get(current_page, page_dashboard_router)()
-    st.markdown('</div>', unsafe_allow_html=True)
 
     # ── Hamburger Menu Icon + Sidebar Toggle ─────────────────────
     st.markdown('<div class="hamburger-wrap">', unsafe_allow_html=True)
@@ -1813,23 +1812,30 @@ def main():
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Auto-close sidebar on mobile setelah ganti halaman
+    page_map.get(current_page, page_dashboard_router)()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Sidebar toggle — semua ukuran layar
     sidebar_closed = not st.session_state.get("sidebar_open", False)
     st.markdown(f"""
     <style>
+    @media (min-width: 721px) {{
+      [data-testid="stSidebar"] {{
+        transition: margin-left 0.3s ease, opacity 0.3s ease !important;
+        {'margin-left: 0 !important; opacity: 1;' if not sidebar_closed else 'margin-left: calc(-1 * var(--sidebar-width)) !important; opacity: 0; pointer-events: none;'}
+      }}
+    }}
     @media (max-width: 720px) {{
       [data-testid="stSidebar"] {{
         position: fixed !important;
         top: 0 !important;
+        left: 0 !important;
         height: 100vh !important;
         z-index: 99995 !important;
         min-width: var(--sidebar-width) !important;
         max-width: var(--sidebar-width) !important;
         transition: left 0.3s ease, opacity 0.3s ease !important;
         {'left: 0 !important; opacity: 1; pointer-events: all;' if not sidebar_closed else 'left: calc(-1 * var(--sidebar-width)) !important; opacity: 0; pointer-events: none;'}
-      }}
-      [data-testid="stSidebarCollapsedControl"] {{
-        display: none !important;
       }}
     }}
     </style>

@@ -33,11 +33,16 @@ def _default_opts(**extra):
         "overwrites": True,
         "extract_flat": False,
         "ffmpeg_location": FFMPEG_PATH,
-        "extractor_args": {"youtube": {"skip": ["dash", "hls"], "player_client": ["android"]}},
+        "extractor_args": {
+            "youtube": {
+                "skip": ["dash", "hls"],
+                "player_client": ["android", "web", "ios"],
+            },
+        },
         "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Language": "en-US,en;q=0.9",
         },
         "retries": 10,
         "fragment_retries": 10,
@@ -98,7 +103,9 @@ class VideoDownloader:
         try:
             with yt_dlp.YoutubeDL(_default_opts()) as ydl:
                 info = ydl.extract_info(url, download=False)
-        except: info = {}
+        except Exception as e:
+            print(f"[download_audio] Gagal extract info: {e}")
+            info = {}
         title = info.get("title","Unknown")
         dur = info.get("duration",0) or 0
         limit = min(dur or max_dur, max_dur)
@@ -112,19 +119,36 @@ class VideoDownloader:
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
-        except:
+        except Exception as e:
+            print(f"[download_audio] Download gagal (fallback ke internal): {e}")
             opts.pop("external_downloader", None)
             opts.pop("external_downloader_args", None)
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download([url])
-        files = sorted(Path(out).glob("audio_*.wav"))
+            try:
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    ydl.download([url])
+            except Exception as e2:
+                print(f"[download_audio] Download gagal total: {e2}")
+                return ("", title, dur)
+        files = sorted(Path(out).glob("audio_*.wav")) or sorted(Path(out).glob("audio_*.*"))
         if files:
-            # Normalize to 16000Hz mono WAV for Whisper
             raw_wav = str(files[0])
-            temp_wav = raw_wav + ".normalized.wav"
-            subprocess.run([FFMPEG_PATH, "-y", "-i", raw_wav, "-ac", "1", "-ar", "16000", temp_wav], capture_output=True)
-            if Path(temp_wav).exists():
-                os.replace(temp_wav, raw_wav)
+            # If not already wav, convert
+            if not raw_wav.endswith(".wav"):
+                temp_wav = raw_wav.rsplit(".",1)[0] + ".wav"
+                r = subprocess.run([FFMPEG_PATH, "-y", "-i", raw_wav, "-ac", "1", "-ar", "16000", temp_wav], capture_output=True, text=True)
+                if Path(temp_wav).exists():
+                    raw_wav = temp_wav
+                else:
+                    print(f"[download_audio] Gagal konversi ke WAV: {r.stderr[:200]}")
+                    return ("", title, dur)
+            else:
+                # Normalize to 16000Hz mono WAV for Whisper
+                temp_wav = raw_wav + ".normalized.wav"
+                r = subprocess.run([FFMPEG_PATH, "-y", "-i", raw_wav, "-ac", "1", "-ar", "16000", temp_wav], capture_output=True, text=True)
+                if Path(temp_wav).exists():
+                    os.replace(temp_wav, raw_wav)
+                else:
+                    print(f"[download_audio] Gagal normalize WAV: {r.stderr[:200]}")
             return (raw_wav, title, dur)
         return ("", title, dur)
 
@@ -137,30 +161,40 @@ class VideoDownloader:
         final = os.path.join(out, f"clip_{cid}.mp4")
         dur = ett - stt
         opts = _default_opts(
-            # Quality-first: do not force worstvideo. Use a safer upper bound
-            # closer to what opus-clip style tools often keep (typically 720p+ when available).
             format="bestvideo[height<=1080][fps<=60]+bestaudio/best[height<=1080][fps<=60]",
             outtmpl=os.path.join(out, f"raw_{cid}.%(ext)s"),
             merge_output_format="mp4",
-
             external_downloader="ffmpeg",
             external_downloader_args={"ffmpeg": ["-ss", str(stt), "-t", str(dur)]},
         )
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
-        except:
+        except Exception as e:
+            print(f"[download_video_clip] Download gagal (fallback ke internal): {e}")
             opts.pop("external_downloader", None)
             opts.pop("external_downloader_args", None)
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download([url])
+            try:
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    ydl.download([url])
+            except Exception as e2:
+                print(f"[download_video_clip] Download gagal total: {e2}")
+                return ""
         rfs = sorted(Path(out).glob(f"raw_{cid}.*"))
-        if not rfs: return ""
+        if not rfs:
+            print(f"[download_video_clip] Tidak ada file hasil download untuk {cid}")
+            return ""
         rf = str(rfs[0])
+        if Path(rf).stat().st_size == 0:
+            print(f"[download_video_clip] File hasil download kosong: {rf}")
+            return ""
         if rf != final:
-            subprocess.run([FFMPEG_PATH,"-y","-ss",str(stt),"-i",rf,
+            r = subprocess.run([FFMPEG_PATH,"-y","-ss",str(stt),"-i",rf,
                 "-t",str(dur),"-c:v","libx264","-c:a","aac","-preset","fast",final],
                 capture_output=True, text=True)
+            if not Path(final).exists():
+                print(f"[download_video_clip] Gagal trim/clip video: {r.stderr[:200]}")
+                return rf
         return final if Path(final).exists() else rf
 
     @staticmethod
