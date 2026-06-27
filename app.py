@@ -1195,7 +1195,7 @@ def _page_curate():
                 <span style="font-weight:700;font-size:13px;color:var(--carbon);font-family:Arial,sans-serif">{m.category}</span>
                 <span class="badge badge-green">{d:.0f}s</span>
               </div>
-              <p style="margin:2px 0 0;font-size:11px;color:var(--ink-soft)">{int(m.start_time//60)}:{int(m.start_time%60):02d} \u2013 {int(m.end_time//60)}:{int(m.end_time%60):02d}</p>
+              <p style="margin:2px 0 0;font-size:11px;color:var(--ink-soft)">\U0001f504 Mulai: <strong>{int(m.start_time//60)}:{int(m.start_time%60):02d}</strong> \u2013 Selesai: <strong>{int(m.end_time//60)}:{int(m.end_time%60):02d}</strong> (durasi: {d:.0f}s)</p>
               <p style="margin:2px 0 0;font-size:10px;color:var(--muted-indigo)">{m.reason}</p>
             </div>
           </div>
@@ -1218,6 +1218,26 @@ def _page_editor():
     st.markdown('<h1 class="page-header">Edit Video</h1>', unsafe_allow_html=True)
     st.markdown(f'<p class="page-sub">{mom.category} \u2014 {mom.reason}</p>', unsafe_allow_html=True)
     _step_bar(4)
+
+    # ── Video Preview Monitor ─────────────────────────────────
+    if res and res.video_path and Path(res.video_path).exists():
+        st.markdown('<p style="font-size:11px;font-weight:700;margin:0 0 var(--sp-xs);text-transform:uppercase;letter-spacing:0.3px;color:var(--ink-soft)">\U0001f4fd Preview</p>', unsafe_allow_html=True)
+        col_vid1, col_vid2 = st.columns([3, 1])
+        with col_vid1:
+            st.video(res.video_path)
+        with col_vid2:
+            md = min(max(mom.end_time-mom.start_time, 5), 120)
+            dur = float(res.duration)
+            st.markdown(f"""
+            <div style="background:var(--periwinkle);padding:var(--sp-md);clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);box-shadow:inset 0 1px 0 rgba(255,255,255,0.2),inset 0 -1px 0 var(--chrome-indigo)">
+              <p style="font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.3px;margin:0 0 6px">\u2139 Info</p>
+              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Mulai:</strong> {int(mom.start_time//60)}:{int(mom.start_time%60):02d}</p>
+              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Selesai:</strong> {int(mom.end_time//60)}:{int(mom.end_time%60):02d}</p>
+              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Durasi:</strong> {mom.end_time-mom.start_time:.0f}s</p>
+              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Kategori:</strong> {mom.category}</p>
+            </div>
+            """, unsafe_allow_html=True)
+
     c1, c2 = st.columns(2)
     md = min(max(mom.end_time-mom.start_time, 5), 120)
     dur = float(res.duration)
@@ -1269,6 +1289,9 @@ def _page_editor():
     with tabs[2]:
         st.markdown('<p style="font-size:11px;font-weight:700;margin-bottom:var(--sp-sm);text-transform:uppercase;letter-spacing:0.3px;color:var(--ink-soft)">Reverse Clip</p>', unsafe_allow_html=True)
         rev = st.checkbox("Putar Mundur (Reverse Video)", value=False, help="Video akan diputar dari akhir ke awal seperti efek mundur di CapCut")
+    with tabs[3]:
+        st.markdown('<p style="font-size:11px;font-weight:700;margin-bottom:var(--sp-sm);text-transform:uppercase;letter-spacing:0.3px;color:var(--ink-soft)">Text Overlay</p>', unsafe_allow_html=True)
+        text_overlay = st.text_area("Teks Overlay", "", height=80, placeholder="Teks yang akan ditampilkan di tengah video...", label_visibility="collapsed", help="Teks akan muncul di tengah video dengan efek animasi")
         st.markdown('<hr class="dotted-divider">', unsafe_allow_html=True)
         st.markdown('<p style="font-size:11px;font-weight:700;margin-bottom:var(--sp-sm);text-transform:uppercase;letter-spacing:0.3px;color:var(--ink-soft)">Chroma Key / Green Screen</p>', unsafe_allow_html=True)
         ck_enable = st.checkbox("Aktifkan Chroma Key", value=False, help="Hilangkan background hijau/biru seperti di CapCut")

@@ -101,7 +101,7 @@ Transkrip:
 {transcript}
 
 JSON Output:"""
-    result = _ask(prompt, 256, model_name)
+    result = _ask(prompt, 512, model_name)
     try:
         import re
         m = re.search(r"\[\s*\{.*\}\s*\]", result, re.DOTALL)
