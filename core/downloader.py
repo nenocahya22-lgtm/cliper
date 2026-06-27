@@ -32,17 +32,18 @@ def _default_opts(**extra):
         "no_part": True,
         "overwrites": True,
         "extract_flat": False,
-        "extractor_args": {"youtube": {"skip": ["dash", "hls"], "player_client": ["android", "web"]}},
+        "ffmpeg_location": FFMPEG_PATH,
+        "extractor_args": {"youtube": {"skip": ["dash", "hls"], "player_client": ["android"]}},
         "http_headers": {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "en-US,en;q=0.5",
         },
-        "retries": 3,
-        "fragment_retries": 3,
-        "retry_sleep_functions": {"http": lambda n: 2},
-        "socket_timeout": 30,
-        "extractor_retries": 2,
+        "retries": 10,
+        "fragment_retries": 10,
+        "retry_sleep_functions": {"http": lambda n: 5},
+        "socket_timeout": 60,
+        "extractor_retries": 5,
     }
     opts.update(extra)
     return opts
@@ -102,9 +103,9 @@ class VideoDownloader:
         dur = info.get("duration",0) or 0
         limit = min(dur or max_dur, max_dur)
         opts = _default_opts(
-            format="worstaudio/worst",
-            outtmpl=os.path.join(out,"audio_%(id)s.%(ext)s"),
-            postprocessors=[{"key":"FFmpegExtractAudio","preferredcodec":"wav"}],
+            format="bestaudio/best",
+            outtmpl=os.path.join(out, "audio_%(id)s.%(ext)s"),
+            postprocessors=[{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
             external_downloader="ffmpeg",
             external_downloader_args={"ffmpeg": ["-ss", "0", "-t", str(limit)]},
         )
@@ -117,7 +118,15 @@ class VideoDownloader:
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
         files = sorted(Path(out).glob("audio_*.wav"))
-        return (str(files[0]), title, dur) if files else ("", title, dur)
+        if files:
+            # Normalize to 16000Hz mono WAV for Whisper
+            raw_wav = str(files[0])
+            temp_wav = raw_wav + ".normalized.wav"
+            subprocess.run([FFMPEG_PATH, "-y", "-i", raw_wav, "-ac", "1", "-ar", "16000", temp_wav], capture_output=True)
+            if Path(temp_wav).exists():
+                os.replace(temp_wav, raw_wav)
+            return (raw_wav, title, dur)
+        return ("", title, dur)
 
     @staticmethod
     def download_video_clip(url: str, out: str, stt: float=0, ett: float=60) -> str:

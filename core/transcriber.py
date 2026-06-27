@@ -31,7 +31,7 @@ class AudioTranscriber:
         all_words = []
         try:
             segs, info = model.transcribe(audio_path, beam_size=1, word_timestamps=True,
-                vad_filter=True, vad_parameters=dict(min_silence_duration_ms=500))
+                vad_filter=True)
             for s in segs:
                 t = s.text.strip()
                 if t and s.words:

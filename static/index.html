@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VideoClipse</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+:root {
+  --bg-sidebar:#0f0f13;--bg-main:#f5f5f7;--bg-card:#fff;
+  --primary:#3ecf8e;--primary-deep:#2db87a;--primary-soft:rgba(62,207,142,0.12);
+  --primary-glow:rgba(62,207,142,0.25);
+  --ink:#0d0d0d;--ink-mute:#6b6b6b;--ink-faint:#a1a1a1;
+  --ink-on-dark:#e8e8e8;--ink-mute-dark:#8a8a8a;
+  --hairline:rgba(0,0,0,0.06);--hairline-dark:rgba(255,255,255,0.08);
+  --radius-sm:6px;--radius-md:10px;--radius-lg:14px;
+  --shadow-card:0 1px 3px rgba(0,0,0,0.04),0 1px 2px rgba(0,0,0,0.03);
+  --shadow-hover:0 4px 12px rgba(0,0,0,0.06),0 1px 3px rgba(0,0,0,0.04);
+  --sidebar-width:240px;--transition:0.2s cubic-bezier(0.4,0,0.2,1);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg-main);font-family:'Inter','Helvetica Neue',sans-serif;color:var(--ink);height:100%}
+body{display:flex}
+a{color:var(--primary);text-decoration:none}
+button{cursor:pointer;font-family:'Inter',sans-serif;font-weight:500;font-size:14px;border:none;border-radius:var(--radius-sm);padding:8px 18px;transition:all var(--transition);line-height:1.4}
+button:disabled{opacity:0.4;cursor:not-allowed}
+.btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary-deep));color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,0.05)}
+.btn-primary:hover{box-shadow:0 4px 12px var(--primary-glow);transform:translateY(-1px)}
+.btn-secondary{background:var(--bg-card);color:var(--ink);border:1px solid var(--hairline);box-shadow:var(--shadow-card)}
+.btn-secondary:hover{border-color:var(--primary);box-shadow:var(--shadow-hover)}
+.btn-ghost{background:transparent;color:var(--ink-mute);padding:8px 12px}
+.btn-ghost:hover{background:var(--bg-card)}
+.btn-danger{background:rgba(239,68,68,0.1);color:#ef4444}
+.btn-danger:hover{background:rgba(239,68,68,0.2)}
+input,select,textarea{border-radius:var(--radius-sm);border:1px solid var(--hairline);font-family:'Inter',sans-serif;font-size:15px;color:var(--ink);background:var(--bg-card);padding:8px 12px;outline:none;width:100%;transition:border-color var(--transition),box-shadow var(--transition)}
+input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+label{font-size:13px;font-weight:500;color:var(--ink-mute);margin-bottom:4px;display:block}
+hr{border:none;border-top:1px solid var(--hairline);margin:16px 0}
+
+/* Layout */
+.sidebar{width:var(--sidebar-width);background:var(--bg-sidebar);height:100vh;overflow-y:auto;padding:24px 16px;display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0}
+.sidebar::-webkit-scrollbar{width:0}
+.sidebar-logo{display:flex;align-items:center;gap:12px;padding:0 8px 24px 8px;border-bottom:1px solid var(--hairline-dark);margin-bottom:20px}
+.sidebar-logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--primary),var(--primary-deep));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;box-shadow:0 2px 8px var(--primary-glow)}
+.sidebar-logo-text{font-weight:700;font-size:18px;letter-spacing:-0.5px;color:#fff;line-height:1.2}
+.sidebar-logo-sub{font-size:10px;color:var(--ink-mute-dark);letter-spacing:0.5px;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 14px;margin-bottom:2px;border-radius:var(--radius-md);font-size:14px;font-weight:500;color:var(--ink-mute-dark);background:transparent;border:none;width:100%;text-align:left;transition:all var(--transition)}
+.nav-item:hover{background:rgba(255,255,255,0.06);color:var(--ink-on-dark)}
+.nav-item.active{background:var(--primary-soft);color:var(--primary);font-weight:600}
+.sidebar-accounts{margin-top:auto;padding-top:16px;border-top:1px solid var(--hairline-dark)}
+.sidebar-account-row{display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:12px;color:var(--ink-mute-dark)}
+.sidebar-account-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sidebar-footer{margin-top:16px;padding:12px 8px 0;border-top:1px solid var(--hairline-dark);font-size:10px;color:var(--ink-mute-dark);line-height:1.5}
+.sidebar-model{margin:12px 0 8px 8px}
+.sidebar-model label{font-size:12px;font-weight:600;color:var(--ink-mute-dark)}
+.sidebar-model select{font-size:13px;padding:6px 8px;background:rgba(255,255,255,0.05);color:var(--ink-on-dark);border-color:var(--hairline-dark)}
+
+.main{flex:1;overflow-y:auto;padding:32px 24px;max-width:860px}
+.page-header{font-size:28px;font-weight:700;letter-spacing:-0.6px;margin:0 0 4px 0;line-height:1.2}
+.page-sub{font-size:14px;color:var(--ink-mute);margin:0 0 28px 0;line-height:1.4}
+
+/* Cards */
+.card{background:var(--bg-card);border:1px solid var(--hairline);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow-card);transition:box-shadow var(--transition),border-color var(--transition)}
+.card:hover{box-shadow:var(--shadow-hover);border-color:rgba(0,0,0,0.1)}
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:28px}
+.dash-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:20px;text-align:center;border:1px solid var(--hairline);box-shadow:var(--shadow-card);transition:transform var(--transition),box-shadow var(--transition)}
+.dash-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover)}
+.dash-num{font-size:34px;font-weight:700;color:var(--primary);margin:0;line-height:1}
+.dash-num-dark{color:var(--ink)}
+.dash-label{font-size:12px;color:var(--ink-mute);margin:6px 0 0 0;font-weight:500}
+.dash-icon{font-size:24px;margin-bottom:8px}
+
+/* Step bar */
+.step-bar{display:flex;align-items:center;gap:8px;margin-bottom:24px;padding:16px;background:var(--bg-card);border-radius:var(--radius-lg);border:1px solid var(--hairline);flex-wrap:wrap}
+.step-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-faint);transition:color var(--transition)}
+.step-item.active{color:var(--ink);font-weight:600}
+.step-item.done{color:var(--primary)}
+.step-dot{width:6px;height:6px;border-radius:50%;background:var(--hairline);flex-shrink:0;transition:background var(--transition)}
+.step-item.active .step-dot,.step-item.done .step-dot{background:var(--primary)}
+.step-line{width:20px;height:1px;background:var(--hairline);flex-shrink:0}
+
+/* Queue & moment cards */
+.queue-card,.moment-card{background:var(--bg-card);border:1px solid var(--hairline);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:10px;box-shadow:var(--shadow-card);transition:all var(--transition)}
+.moment-card:hover,.queue-card:hover{border-color:var(--primary);box-shadow:var(--shadow-hover)}
+
+/* Tabs */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--hairline);margin-bottom:16px}
+.tab{padding:10px 16px;font-size:13px;font-weight:500;color:var(--ink-mute);background:transparent;border:none;border-bottom:2px solid transparent;transition:all var(--transition)}
+.tab:hover{color:var(--ink)}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+
+/* Badge */
+.badge{display:inline-block;padding:2px 10px;border-radius:9999px;font-size:11px;font-weight:600;letter-spacing:0.3px}
+.badge-green{background:var(--primary-soft);color:var(--primary-deep)}
+.badge-gray{background:var(--bg-main);color:var(--ink-mute)}
+.badge-red{background:rgba(239,68,68,0.1);color:#ef4444}
+.badge-blue{background:rgba(59,130,246,0.1);color:#3b82f6}
+
+/* Grid helpers */
+.row{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.col{flex:1;min-width:0}
+.col-3{flex:1;min-width:120px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px}
+
+/* Progress */
+.progress{height:6px;background:var(--hairline);border-radius:3px;overflow:hidden;margin:12px 0}
+.progress-bar{height:100%;background:linear-gradient(90deg,var(--primary),var(--primary-deep));border-radius:3px;transition:width 0.3s}
+
+/* Skeleton */
+@keyframes skeleton-loading{0%{background-position:-200px 0}100%{background-position:calc(200px+100%) 0}}
+.skeleton{background:linear-gradient(90deg,var(--hairline) 25%,rgba(0,0,0,0.04) 50%,var(--hairline) 75%);background-size:200px 100%;animation:skeleton-loading 1.5s ease-in-out infinite;border-radius:var(--radius-sm);height:16px;margin-bottom:8px}
+
+/* Toast */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:12px 20px;border-radius:var(--radius-md);font-size:13px;z-index:999;animation:fadeIn 0.3s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* Checkbox slider */
+.checkbox-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.checkbox-row input[type="checkbox"]{width:auto}
+.checkbox-row label{margin:0;cursor:pointer}
+.radio-group{display:flex;gap:16px;margin:8px 0}
+.radio-group label{font-size:13px;color:var(--ink);display:flex;align-items:center;gap:4px;cursor:pointer}
+
+.form-group{margin-bottom:12px}
+.form-group label{font-size:13px;font-weight:500;color:var(--ink-mute);margin-bottom:4px}
+
+video{border-radius:var(--radius-lg);border:1px solid var(--hairline);max-width:100%}
+.empty-state{text-align:center;padding:40px;color:var(--ink-faint)}
+.empty-state p{font-size:14px;margin-top:8px}
+
+@media(max-width:640px){
+  .sidebar{width:60px;padding:16px 8px}
+  .sidebar-logo-text,.sidebar-logo-sub,.nav-item span,.sidebar-accounts,.sidebar-footer,.sidebar-model{display:none}
+  .nav-item{justify-content:center;padding:10px}
+  .main{padding:20px 16px}
+  .dash-grid{grid-template-columns:1fr 1fr}
+  .grid-3,.grid-2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-icon">⚡</div>
+    <div><div class="sidebar-logo-text">VideoClipse</div><div class="sidebar-logo-sub">AI Video Studio</div></div>
+  </div>
+  <button class="nav-item active" data-page="dashboard"><span>📊</span><span>Dashboard</span></button>
+  <button class="nav-item" data-page="new_clip"><span>➕</span><span>New Clip</span></button>
+  <button class="nav-item" data-page="my_clips"><span>🎬</span><span>My Clips</span></button>
+  <button class="nav-item" data-page="queue"><span>📋</span><span>Queue</span></button>
+  <button class="nav-item" data-page="schedule"><span>📅</span><span>Schedule</span></button>
+  <button class="nav-item" data-page="accounts"><span>👤</span><span>Accounts</span></button>
+  <button class="nav-item" data-page="stats"><span>📈</span><span>Stats</span></button>
+  <div class="sidebar-model">
+    <label>Ollama Model</label>
+    <select id="ollamaModel">
+      <option>llama3.2:latest</option>
+      <option>qwen2.5-coder:1.5b</option>
+      <option>Custom</option>
+    </select>
+    <input type="text" id="customModel" placeholder="Nama model custom" style="display:none;margin-top:4px;font-size:12px;padding:4px 6px">
+  </div>
+  <div class="sidebar-accounts" id="sidebarAccounts"></div>
+  <div class="sidebar-footer">VideoClipse v6 · Offline · No API key</div>
+</nav>
+
+<!-- Main -->
+<main class="main" id="app"></main>
+
+<script>
+const API = '';
+let state = {
+  page: 'dashboard',
+  jobId: null,
+  result: null,
+  selMoment: null,
+  outVideo: null,
+  processing: false,
+  step: 1,
+  src: 'url',
+};
+
+function qs(sel) { return document.querySelector(sel) }
+function qsa(sel) { return document.querySelectorAll(sel) }
+function el(tag, cls, html) { const e=document.createElement(tag); if(cls)e.className=cls; if(html)e.innerHTML=html; return e }
+
+async function api(method, path, body) {
+  const opts = { method, headers: {} };
+  if (body && !(body instanceof FormData)) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  } else if (body) {
+    opts.body = body;
+  }
+  const r = await fetch(API + path, opts);
+  if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.detail || r.statusText); }
+  return r.json();
+}
+
+function toast(msg) {
+  const t = el('div', 'toast', msg);
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+function render() {
+  const p = state.page === 'process' ? 'dashboard' : state.page;
+  qsa('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.page === p));
+  const pages = {
+    dashboard: renderDashboard,
+    new_clip: renderNewClip,
+    my_clips: renderMyClips,
+    queue: renderQueue,
+    schedule: renderSchedule,
+    accounts: renderAccounts,
+    stats: renderStats,
+    process: renderProcess,
+    curate: renderCurate,
+    editor: renderEditor,
+    preview: renderPreview,
+  };
+  const fn = pages[state.page] || renderDashboard;
+  qs('#app').innerHTML = '';
+  fn();
+  updateSidebarAccounts();
+}
+
+async function updateSidebarAccounts() {
+  try {
+    const accts = await api('GET', '/api/accounts');
+    const container = qs('#sidebarAccounts');
+    container.innerHTML = Object.entries(accts).map(([k,v]) =>
+      `<div class="sidebar-account-row"><span class="sidebar-account-dot" style="background:${v.status==='connected'?'#3ecf8e':'#5a5a5a'}"></span> ${k.charAt(0).toUpperCase()+k.slice(1)}</div>`
+    ).join('');
+  } catch(e) {}
+}
+
+// ── Dashboard ──────────────────────────────────────────────
+async function renderDashboard() {
+  const app = qs('#app');
+  try {
+    const stats = await api('GET', '/api/stats');
+    const recent = await api('GET', '/api/recent-clips?limit=3');
+    app.innerHTML = `
+      <div class="row" style="align-items:center;justify-content:space-between">
+        <h1 class="page-header" style="margin:0">Dashboard</h1>
+        <button class="btn-primary" onclick="goPage('new_clip')">+ New Clip</button>
+      </div>
+      <div class="dash-grid">
+        <div class="dash-card"><div class="dash-icon">📨</div><p class="dash-num">${stats.uploaded_today}</p><p class="dash-label">Uploaded Today</p></div>
+        <div class="dash-card"><div class="dash-icon">⏳</div><p class="dash-num dash-num-dark">${stats.remaining}</p><p class="dash-label">Remaining Today</p></div>
+        <div class="dash-card"><div class="dash-icon">📋</div><p class="dash-num dash-num-dark">${stats.in_queue}</p><p class="dash-label">In Queue</p></div>
+        <div class="dash-card"><div class="dash-icon">🎬</div><p class="dash-num dash-num-dark">${stats.total_clips}</p><p class="dash-label">Total Clips</p></div>
+      </div>
+      <p style="font-size:13px;font-weight:600;color:var(--ink-mute);margin-bottom:10px">Quick Actions</p>
+      <div class="grid-3">
+        <button class="btn-primary" style="padding:16px;font-size:13px" onclick="goPage('new_clip')">🔗 Create from Link</button>
+        <button class="btn-secondary" style="padding:16px;font-size:13px" onclick="goPage('new_clip')">📁 Upload Local</button>
+        <button class="btn-secondary" style="padding:16px;font-size:13px" onclick="goPage('new_clip')">🌾 Farm Mode</button>
+      </div>
+      ${recent.items && recent.items.length ? `
+        <p style="font-size:13px;font-weight:600;color:var(--ink-mute);margin:20px 0 10px">Recent Clips</p>
+        ${recent.items.map(v => `
+          <div class="queue-card" style="display:flex;justify-content:space-between;align-items:center">
+            <div><div style="font-weight:500;font-size:14px">${v.name}</div><div style="font-size:12px;color:var(--ink-mute)">${v.size_mb} MB · ${v.mtime}</div></div>
+          </div>
+        `).join('')}
+      ` : ''}
+    `;
+  } catch(e) { app.innerHTML = `<p>Error loading dashboard: ${e.message}</p>` }
+}
+
+// ── New Clip ───────────────────────────────────────────────
+function renderNewClip() {
+  const app = qs('#app');
+  app.innerHTML = `
+    <h1 class="page-header">New Clip</h1>
+    <p class="page-sub">Paste a link or upload a file to create viral clips</p>
+    <div class="tabs" id="ncTabs">
+      <button class="tab active" data-tab="link">🔗 Link</button>
+      <button class="tab" data-tab="upload">📁 Upload</button>
+      <button class="tab" data-tab="farm">🌾 Farm</button>
+    </div>
+    <div id="ncContent"></div>
+  `;
+  showNCTab('link');
+  qsa('#ncTabs .tab').forEach(t => t.onclick = () => showNCTab(t.dataset.tab));
+}
+
+function showNCTab(tab) {
+  state.src = tab;
+  qsa('#ncTabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  const content = qs('#ncContent');
+  if (tab === 'link') {
+    content.innerHTML = `
+      <div class="form-group"><input type="text" id="urlInput" placeholder="https://youtube.com/..."></div>
+      <div id="urlInfo"></div>
+      <div class="radio-group">
+        <label><input type="radio" name="mmLink" value="Rule-based (Cepat)" checked> Rule-based (Cepat)</label>
+        <label><input type="radio" name="mmLink" value="Llama AI (Pintar)"> Llama AI (Pintar)</label>
+      </div>
+      <button class="btn-primary" style="width:100%" onclick="processURL()">Download & Analyze</button>
+    `;
+  } else if (tab === 'upload') {
+    content.innerHTML = `
+      <div class="form-group"><input type="file" id="fileInput" accept=".mp4,.mov,.avi,.mkv,.webm,.flv,.wmv,.m4v"></div>
+      <div id="fileInfo"></div>
+      <div class="radio-group">
+        <label><input type="radio" name="mmLocal" value="Rule-based (Cepat)" checked> Rule-based (Cepat)</label>
+        <label><input type="radio" name="mmLocal" value="Llama AI (Pintar)"> Llama AI (Pintar)</label>
+      </div>
+      <button class="btn-primary" style="width:100%" onclick="processLocal()">Process Local Video</button>
+    `;
+    qs('#fileInput').onchange = function() {
+      if (this.files[0]) {
+        qs('#fileInfo').innerHTML = `<p style="color:var(--ink-mute);font-size:13px">${this.files[0].name} (${(this.files[0].size/(1024*1024)).toFixed(1)} MB)</p>`;
+      }
+    };
+  } else if (tab === 'farm') {
+    content.innerHTML = `
+      <p style="font-size:14px;color:var(--ink-mute);margin-bottom:16px">One link → multiple clips → scheduled upload</p>
+      <div class="form-group"><input type="text" id="farmUrl" placeholder="https://youtube.com/..."></div>
+      <div class="grid-3">
+        <div class="form-group">
+          <label>Platforms</label>
+          <select id="farmPlat" multiple style="height:70px">
+            <option value="youtube" selected>YouTube</option>
+            <option value="tiktok">TikTok</option>
+            <option value="facebook">Facebook</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Clips</label>
+          <input type="number" id="farmCount" value="5" min="1" max="10">
+        </div>
+        <div class="form-group">
+          <label>Start time</label>
+          <input type="text" id="farmTime" value="08:00">
+        </div>
+      </div>
+      <div class="radio-group">
+        <label><input type="radio" name="mmFarm" value="Rule-based (Cepat)" checked> Rule-based (Cepat)</label>
+        <label><input type="radio" name="mmFarm" value="Llama AI (Pintar)"> Llama AI (Pintar)</label>
+      </div>
+      <button class="btn-primary" style="width:100%" onclick="processFarm()">Process & Schedule All</button>
+    `;
+  }
+}
+
+function getModel() {
+  const sel = qs('#ollamaModel');
+  if (sel.value === 'Custom') return qs('#customModel').value || 'llama3.2:latest';
+  return sel.value;
+}
+
+async function processURL() {
+  const url = qs('#urlInput').value.trim();
+  if (!url) return;
+  try {
+    const r = await api('POST', '/api/process', { url, moment_mode: qs('input[name="mmLink"]:checked').value, model_name: getModel() });
+    state.jobId = r.job_id;
+    state.page = 'process';
+    render();
+  } catch(e) { toast('Error: ' + e.message) }
+}
+
+async function processLocal() {
+  const file = qs('#fileInput').files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('moment_mode', qs('input[name="mmLocal"]:checked').value);
+  fd.append('model_name', getModel());
+  try {
+    const r = await api('POST', '/api/process-local', fd);
+    state.jobId = r.job_id;
+    state.page = 'process';
+    render();
+  } catch(e) { toast('Error: ' + e.message) }
+}
+
+async function processFarm() {
+  const url = qs('#farmUrl').value.trim();
+  if (!url) return;
+  const sel = qs('#farmPlat');
+  const platforms = Array.from(sel.selectedOptions).map(o => o.value);
+  const count = parseInt(qs('#farmCount').value) || 5;
+  const startTime = qs('#farmTime').value || '08:00';
+  const momentMode = qs('input[name="mmFarm"]:checked').value;
+  try {
+    await api('POST', '/api/process', { url, moment_mode: momentMode, model_name: getModel() });
+    toast('Farm job started! Check progress in Queue.');
+  } catch(e) {
+    toast('Farm error: ' + e.message);
+  }
+}
+
+// ── Process ────────────────────────────────────────────────
+function renderProcess() {
+  const app = qs('#app');
+  app.innerHTML = `
+    <h1 class="page-header">Processing...</h1>
+    <p class="page-sub">Downloading, transcribing, and analyzing your video</p>
+    <div id="procStatus"></div>
+    <div class="progress"><div class="progress-bar" id="procBar" style="width:5%"></div></div>
+  `;
+  pollJob();
+}
+
+let pollTimer = null;
+
+async function pollJob() {
+  if (!state.jobId) { goPage('dashboard'); return; }
+  try {
+    const job = await api('GET', '/api/job/' + state.jobId);
+    const statusDiv = qs('#procStatus');
+    const bar = qs('#procBar');
+    if (job.error) {
+      statusDiv.innerHTML = `<p style="color:#ef4444">Error: ${job.error}</p>`;
+      bar.style.width = '100%';
+      return;
+    }
+    if (job.transcript) {
+      statusDiv.innerHTML = `<p style="color:var(--primary)">✓ Transkripsi selesai (${job.transcript.length} chars)</p>`;
+      bar.style.width = '60%';
+    }
+    if (job.moments && job.moments.length) {
+      statusDiv.innerHTML += `<p style="color:var(--primary)">✓ ${job.moments.length} momen viral ditemukan</p>`;
+      bar.style.width = '80%';
+    }
+    if (job.video_path) {
+      statusDiv.innerHTML += `<p style="color:var(--primary)">✓ Video clip siap</p>`;
+      bar.style.width = '100%';
+      state.result = job;
+      state.step = 3;
+      setTimeout(() => { state.page = 'curate'; render(); }, 500);
+      return;
+    }
+    pollTimer = setTimeout(pollJob, 2000);
+  } catch(e) {
+    qs('#procStatus') && (qs('#procStatus').innerHTML = `<p style="color:#ef4444">Error: ${e.message}</p>`);
+  }
+}
+
+// ── Curate ─────────────────────────────────────────────────
+function renderCurate() {
+  const app = qs('#app');
+  const res = state.result;
+  if (!res || !res.moments || !res.moments.length) {
+    app.innerHTML = `<p>No moments found. <button class="btn-secondary" onclick="goPage('new_clip')">Back</button></p>`;
+    return;
+  }
+  app.innerHTML = `
+    <h1 class="page-header">Choose a Moment</h1>
+    <p class="page-sub">${(res.title||'').slice(0,60)} — ${(res.duration||0).toFixed(0)}s total</p>
+    <div class="step-bar">
+      <span class="step-item done"><span class="step-dot done"></span>Input</span><span class="step-line"></span>
+      <span class="step-item done"><span class="step-dot done"></span>Process</span><span class="step-line"></span>
+      <span class="step-item active"><span class="step-dot active"></span>Curate</span><span class="step-line"></span>
+      <span class="step-item"><span class="step-dot"></span>Edit</span><span class="step-line"></span>
+      <span class="step-item"><span class="step-dot"></span>Preview</span>
+    </div>
+    <div id="momentsList"></div>
+  `;
+  const list = qs('#momentsList');
+  res.moments.forEach((m, i) => {
+    const d = m.end_time - m.start_time;
+    const icon = m.category === 'HOOK' ? '🎣' : m.category === 'KLIMAKS' ? '🔥' : m.category === 'CTA' ? '📢' : '⭐';
+    const div = el('div', 'moment-card');
+    div.style.cursor = 'pointer';
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:44px;height:44px;background:var(--bg-main);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:600;font-size:14px">${m.category}</span>
+            <span class="badge badge-green">${d.toFixed(0)}s</span>
+          </div>
+          <p style="margin:2px 0 0;font-size:12px;color:var(--ink-mute)">${Math.floor(m.start_time/60)}:${String(Math.floor(m.start_time%60)).padStart(2,'0')} – ${Math.floor(m.end_time/60)}:${String(Math.floor(m.end_time%60)).padStart(2,'0')}</p>
+          <p style="margin:2px 0 0;font-size:12px;color:var(--ink-faint)">${m.reason}</p>
+        </div>
+        <button class="btn-primary" onclick="selectMoment(${i})">Select</button>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function selectMoment(i) {
+  state.selMoment = state.result.moments[i];
+  state.page = 'editor';
+  render();
+}
+
+// ── Editor ─────────────────────────────────────────────────
+function renderEditor() {
+  const app = qs('#app');
+  const res = state.result;
+  const mom = state.selMoment;
+  if (!res || !mom) { goPage('curate'); return; }
+  const md = Math.min(Math.max(mom.end_time - mom.start_time, 5), 120);
+  const dur = res.duration || 0;
+
+  app.innerHTML = `
+    <h1 class="page-header">Edit Clip</h1>
+    <p class="page-sub">${mom.category} — ${mom.reason}</p>
+    <div class="step-bar">
+      <span class="step-item done"><span class="step-dot done"></span>Input</span><span class="step-line"></span>
+      <span class="step-item done"><span class="step-dot done"></span>Process</span><span class="step-line"></span>
+      <span class="step-item done"><span class="step-dot done"></span>Curate</span><span class="step-line"></span>
+      <span class="step-item active"><span class="step-dot active"></span>Edit</span><span class="step-line"></span>
+      <span class="step-item"><span class="step-dot"></span>Preview</span>
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>Start</label>
+        <input type="number" id="edStart" value="${Math.max(0, mom.start_time)}" min="0" max="${Math.max(0, dur-5)}" step="0.5">
+      </div>
+      <div class="form-group">
+        <label>End</label>
+        <input type="number" id="edEnd" value="${Math.min(mom.end_time, dur)}" min="0" max="${dur}" step="0.5">
+      </div>
+    </div>
+    <p style="font-size:13px;color:var(--ink-mute);margin-bottom:16px">Duration: <span id="edDur">${(mom.end_time - mom.start_time).toFixed(1)}</span>s</p>
+
+    <details open>
+      <summary style="font-weight:600;font-size:14px;cursor:pointer;margin-bottom:12px">Visual Adjustments & Effects</summary>
+      <div class="grid-3">
+        <div class="form-group">
+          <label>Aspect Ratio</label>
+          <select id="edAspect">
+            <option>Portrait 9:16 (Shorts/TikTok)</option>
+            <option>Landscape 16:9 (YouTube/FB)</option>
+            <option>Square 1:1 (Instagram)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Speed</label>
+          <select id="edSpeed">
+            <option>1.0x</option><option>1.05x</option><option>1.07x</option><option>1.1x</option><option>1.15x</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Color Preset</label>
+          <select id="edColor">
+            <option value="none">none</option><option value="warm">warm</option><option value="cool">cool</option>
+            <option value="vibrant">vibrant</option><option value="vintage">vintage</option><option value="neon">neon</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="form-group"><label>Contrast</label><input type="range" id="edContrast" min="0.5" max="2" value="1" step="0.1"></div>
+        <div class="form-group"><label>Brightness</label><input type="range" id="edBright" min="-0.5" max="0.5" value="0" step="0.05"></div>
+        <div class="form-group"><label>Saturation</label><input type="range" id="edSat" min="0" max="3" value="1" step="0.1"></div>
+      </div>
+      <div class="grid-3">
+        <div class="checkbox-row"><input type="checkbox" id="edVig"><label for="edVig">Vignette</label></div>
+        <div class="checkbox-row"><input type="checkbox" id="edSep"><label for="edSep">Sepia Classic</label></div>
+        <div class="checkbox-row"><input type="checkbox" id="edGray"><label for="edGray">Grayscale</label></div>
+      </div>
+      <div class="grid-2">
+        <div class="checkbox-row"><input type="checkbox" id="edSharpen"><label for="edSharpen">Sharpen</label></div>
+        <div class="checkbox-row"><input type="checkbox" id="edEdge"><label for="edEdge">Edge Detect</label></div>
+      </div>
+      <p style="font-size:13px;font-weight:600;margin:10px 0 2px 0">Transitions & Protection</p>
+      <div class="grid-2">
+        <div class="checkbox-row"><input type="checkbox" id="edMirror" checked><label for="edMirror">Mirror Video</label></div>
+        <div class="checkbox-row"><input type="checkbox" id="edNoise" checked><label for="edNoise">Noise Reduction</label></div>
+      </div>
+    </details>
+
+    <details>
+      <summary style="font-weight:600;font-size:14px;cursor:pointer;margin-bottom:12px">Subtitles Styling</summary>
+      <div class="grid-2">
+        <div class="checkbox-row"><input type="checkbox" id="edShowSub" checked><label for="edShowSub">Show Subtitles</label></div>
+        <div class="form-group">
+          <label>Subtitle Color</label>
+          <select id="edSubColor">
+            <option value="Kuning">Kuning</option><option value="Merah">Merah</option><option value="Hijau">Hijau</option>
+            <option value="Cyan">Cyan</option><option value="Pink">Pink</option><option value="Putih">Putih</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label>Font Size</label><input type="range" id="edSubSize" min="10" max="100" value="44" step="2"></div>
+        <div class="form-group"><label>Font Family</label><input type="text" id="edSubFont" value="Montserrat"></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label>Alignment</label>
+          <select id="edSubAlign">
+            <option value="5">Tengah (Center)</option>
+            <option value="2">Bawah (Bottom)</option>
+          </select>
+        </div>
+        <div class="checkbox-row" style="margin-top:24px"><input type="checkbox" id="edSubUpper" checked><label for="edSubUpper">UPPERCASE</label></div>
+      </div>
+      <div class="grid-2">
+        <div class="form-group"><label>Fade In (s)</label><input type="number" id="edFi" value="0.5" min="0" max="2" step="0.1"></div>
+        <div class="form-group"><label>Fade Out (s)</label><input type="number" id="edFo" value="0.8" min="0" max="2" step="0.1"></div>
+      </div>
+    </details>
+
+    <details>
+      <summary style="font-weight:600;font-size:14px;cursor:pointer;margin-bottom:12px">Title & Description</summary>
+      <div class="form-group"><label>Title</label><input type="text" id="edTitle" value="${(res.title||'').slice(0,60)}"></div>
+      <div class="form-group"><label>Description</label><textarea id="edDesc" rows="3" style="resize:vertical"></textarea></div>
+    </details>
+
+    <hr>
+    <div class="checkbox-row"><input type="checkbox" id="edAutoPost"><label for="edAutoPost">Auto-Post ke akun tertaut setelah selesai render</label></div>
+    <button class="btn-primary" style="width:100%;margin-top:12px" onclick="doRender()" id="renderBtn">Render Clip</button>
+  `;
+
+  const st = qs('#edStart'), en = qs('#edEnd');
+  function updateDur() {
+    const s = parseFloat(st.value) || 0;
+    const e = parseFloat(en.value) || 0;
+    qs('#edDur').textContent = Math.max(0, e - s).toFixed(1);
+  }
+  st.oninput = function() {
+    if (parseFloat(this.value) > parseFloat(en.value) - 5) this.value = parseFloat(en.value) - 5;
+    updateDur();
+  };
+  en.oninput = function() {
+    if (parseFloat(this.value) < parseFloat(st.value) + 5) this.value = parseFloat(st.value) + 5;
+    updateDur();
+  };
+}
+
+async function doRender() {
+  const btn = qs('#renderBtn');
+  btn.disabled = true;
+  btn.textContent = 'Rendering...';
+  try {
+    const res = await api('POST', '/api/render', {
+      job_id: state.jobId,
+      start: parseFloat(qs('#edStart').value),
+      end: parseFloat(qs('#edEnd').value),
+      show_subtitles: qs('#edShowSub').checked,
+      subtitle_color: qs('#edSubColor').value,
+      fade_in: parseFloat(qs('#edFi').value),
+      fade_out: parseFloat(qs('#edFo').value),
+      aspect: qs('#edAspect').value,
+      speed: qs('#edSpeed').value,
+      mirror: qs('#edMirror').checked,
+      color_preset: qs('#edColor').value,
+      noise_reduction: qs('#edNoise').checked,
+      title: qs('#edTitle').value,
+      description: qs('#edDesc').value,
+      contrast: parseFloat(qs('#edContrast').value),
+      brightness: parseFloat(qs('#edBright').value),
+      saturation: parseFloat(qs('#edSat').value),
+      vignette: qs('#edVig').checked,
+      sepia: qs('#edSep').checked,
+      grayscale: qs('#edGray').checked,
+      sharpen: qs('#edSharpen').checked,
+      edge_detect: qs('#edEdge').checked,
+      sub_size: parseInt(qs('#edSubSize').value),
+      sub_font: qs('#edSubFont').value,
+      sub_align: parseInt(qs('#edSubAlign').value),
+      sub_upper: qs('#edSubUpper').checked,
+      auto_post: qs('#edAutoPost').checked,
+    });
+    state.outVideo = res;
+    state.step = 5;
+    state.page = 'preview';
+    render();
+  } catch(e) {
+    toast('Render error: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = 'Render Clip';
+  }
+}
+
+// ── Preview ────────────────────────────────────────────────
+function renderPreview() {
+  const app = qs('#app');
+  const ov = state.outVideo;
+  if (!ov) { goPage('editor'); return; }
+  app.innerHTML = `
+    <h1 class="page-header">Preview</h1>
+    <p class="page-sub">${ov.name} — ${ov.size_mb} MB</p>
+    <div class="step-bar">
+      <span class="step-item done"><span class="step-dot done"></span>Input</span><span class="step-line"></span>
+      <span class="step-item done"><span class="step-dot done"></span>Process</span><span class="step-line"></span>
+      <span class="step-item done"><span class="step-dot done"></span>Curate</span><span class="step-line"></span>
+      <span class="step-item done"><span class="step-dot done"></span>Edit</span><span class="step-line"></span>
+      <span class="step-item active"><span class="step-dot active"></span>Preview</span>
+    </div>
+    <video controls style="width:100%"><source src="/api/video/${ov.name}" type="video/mp4"></video>
+    <div style="margin:16px 0">
+      <details open>
+        <summary style="font-weight:600;font-size:14px;cursor:pointer;margin-bottom:8px">Title & Description</summary>
+        <div class="form-group"><label>Title</label><input type="text" id="pvTitle" value="${ov.name.replace(/\.mp4$/,'')}"></div>
+        <div class="form-group"><label>Description</label><textarea id="pvDesc" rows="3" style="resize:vertical"></textarea></div>
+      </details>
+    </div>
+    <p style="font-size:14px;font-weight:500;margin-bottom:8px">Upload to</p>
+    <div class="grid-3" id="pvUploadBtns"></div>
+    <hr>
+    <div class="grid-2">
+      <button class="btn-primary" onclick="startNew()">+ New Clip</button>
+      <button class="btn-danger" onclick="deleteCurrent()">🗑 Delete</button>
+    </div>
+  `;
+  loadUploadButtons();
+}
+
+async function loadUploadButtons() {
+  const container = qs('#pvUploadBtns');
+  try {
+    const accts = await api('GET', '/api/accounts');
+    for (const [plat, data] of Object.entries(accts)) {
+      const btn = el('button', data.status === 'connected' ? 'btn-primary' : 'btn-secondary', '');
+      btn.style.padding = '16px';
+      btn.disabled = data.status !== 'connected';
+      btn.textContent = data.status === 'connected' ? `📤 ${plat.charAt(0).toUpperCase()+plat.slice(1)}` : `🔒 ${plat.charAt(0).toUpperCase()+plat.slice(1)}`;
+      if (data.status === 'connected') {
+        btn.onclick = () => doUpload(plat);
+      }
+      container.appendChild(btn);
+    }
+  } catch(e) {
+    container.innerHTML = '<p>Error loading accounts</p>';
+  }
+}
+
+async function doUpload(platform) {
+  const ov = state.outVideo;
+  const title = qs('#pvTitle').value || ov.name;
+  const desc = qs('#pvDesc').value || '';
+  try {
+    await api('POST', '/api/upload', { platform, path: `/api/video/${ov.name}`, title, description: desc });
+    toast(`Uploaded to ${platform}!`);
+  } catch(e) {
+    toast(`Upload failed: ${e.message}`);
+  }
+}
+
+function startNew() {
+  state.result = null;
+  state.selMoment = null;
+  state.outVideo = null;
+  state.step = 1;
+  state.page = 'new_clip';
+  render();
+}
+
+function deleteCurrent() {
+  const ov = state.outVideo;
+  if (ov && ov.name) {
+    api('DELETE', '/api/clips/' + ov.name).catch(()=>{});
+  }
+  startNew();
+}
+
+// ── My Clips ───────────────────────────────────────────────
+async function renderMyClips() {
+  const app = qs('#app');
+  app.innerHTML = `<h1 class="page-header">My Clips</h1><p class="page-sub">Saved videos in <code>output/</code></p><div id="clipsList"></div>`;
+  try {
+    const data = await api('GET', '/api/clips?page=1');
+    if (!data.items.length) {
+      qs('#clipsList').innerHTML = '<div class="empty-state">🎬<p>No clips yet. Create one from New Clip.</p></div>';
+      return;
+    }
+    data.items.forEach(v => {
+      const div = el('div', 'queue-card');
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.name}</div>
+            <div style="font-size:12px;color:var(--ink-mute);margin:2px 0">${v.size_mb} MB · ${v.mtime}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn-secondary" style="flex:1;font-size:12px" onclick="previewClip('${v.name}')">Preview</button>
+          <button class="btn-primary" style="flex:1;font-size:12px" onclick="uploadClip('${v.name}')">Upload</button>
+          <button class="btn-danger" style="flex:1;font-size:12px" onclick="deleteClip('${v.name}')">Delete</button>
+        </div>
+      `;
+      qs('#clipsList').appendChild(div);
+    });
+    if (data.total_pages > 1) {
+      const p = el('div', '', `<p style="text-align:center;font-size:12px;color:var(--ink-mute);margin:12px 0">Page ${data.page} of ${data.total_pages}</p>`);
+      qs('#clipsList').appendChild(p);
+    }
+  } catch(e) {
+    qs('#clipsList').innerHTML = `<p>Error: ${e.message}</p>`;
+  }
+}
+
+function previewClip(name) {
+  const app = qs('#app');
+  app.innerHTML = `
+    <h1 class="page-header">Preview</h1>
+    <video controls style="width:100%"><source src="/api/video/${name}" type="video/mp4"></video>
+    <button class="btn-secondary" style="margin-top:12px" onclick="render()">Back</button>
+  `;
+}
+
+function uploadClip(name) {
+  state.outVideo = { name, size_mb: 0 };
+  state.page = 'preview';
+  render();
+}
+
+async function deleteClip(name) {
+  if (!confirm('Delete this clip?')) return;
+  await api('DELETE', '/api/clips/' + name);
+  render();
+}
+
+// ── Queue ──────────────────────────────────────────────────
+async function renderQueue() {
+  const app = qs('#app');
+  app.innerHTML = `<h1 class="page-header">Queue</h1><p class="page-sub">Scheduled uploads — edit each item before posting</p><div id="queueList"></div>`;
+  try {
+    const q = await api('GET', '/api/queue');
+    if (!q.length) {
+      qs('#queueList').innerHTML = '<div class="empty-state">📋<p>No items in queue. Add from the Farm tab.</p></div>';
+      return;
+    }
+    q.forEach(item => {
+      const badgeCls = item.status === 'pending' ? 'badge-green' : item.status === 'done' ? 'badge-gray' : 'badge-red';
+      const div = el('div', 'queue-card');
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.url.slice(0,60)}</div>
+            <div style="font-size:12px;color:var(--ink-mute);margin:4px 0">
+              <span class="badge ${badgeCls}">${item.status}</span>
+              ${(item.platforms||['youtube']).join(', ')} · ${item.schedule_at || 'unscheduled'}
+            </div>
+          </div>
+        </div>
+        ${item.status === 'pending' ? `
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn-secondary" style="flex:1;font-size:12px" onclick="editQueueItem(${item.id})">Edit</button>
+            <button class="btn-secondary" style="flex:1;font-size:12px" onclick="skipQueueItem(${item.id})">Skip</button>
+            <button class="btn-danger" style="flex:1;font-size:12px" onclick="deleteQueueItem(${item.id})">Delete</button>
+          </div>
+        ` : ''}
+      `;
+      qs('#queueList').appendChild(div);
+    });
+    const clearBtn = el('button', 'btn-secondary', 'Clear Completed');
+    clearBtn.style.width = '100%';
+    clearBtn.onclick = async () => { await api('POST', '/api/queue/clear-done'); render(); };
+    qs('#queueList').appendChild(clearBtn);
+  } catch(e) {
+    qs('#queueList').innerHTML = `<p>Error: ${e.message}</p>`;
+  }
+}
+
+async function editQueueItem(id) {
+  const url = prompt('New URL:');
+  if (!url) return;
+  await api('POST', '/api/queue/edit', { item_id: id, url });
+  render();
+}
+
+async function skipQueueItem(id) {
+  await api('POST', '/api/queue/edit', { item_id: id, schedule_at: '' });
+  render();
+}
+
+async function deleteQueueItem(id) {
+  await api('DELETE', '/api/queue/' + id);
+  render();
+}
+
+// ── Schedule ───────────────────────────────────────────────
+async function renderSchedule() {
+  const app = qs('#app');
+  app.innerHTML = `<h1 class="page-header">Schedule</h1><p class="page-sub">Set daily upload times</p><div id="schedList"></div>`;
+  try {
+    const sched = await api('GET', '/api/schedule');
+    if (Object.keys(sched).length) {
+      for (const [name, data] of Object.entries(sched)) {
+        const div = el('div', 'queue-card');
+        div.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><div style="font-weight:500;font-size:15px">${name}</div><div style="font-size:12px;color:var(--ink-mute)">${(data.times||[]).join(', ')}</div></div>
+            <button class="btn-danger" onclick="deleteSched('${name}')">Delete</button>
+          </div>
+        `;
+        qs('#schedList').appendChild(div);
+      }
+    }
+    qs('#schedList').insertAdjacentHTML('beforeend', `
+      <details>
+        <summary style="font-weight:600;font-size:14px;cursor:pointer;margin:16px 0 12px">Add Schedule</summary>
+        <div class="form-group"><label>Name</label><input type="text" id="schedName" value="harian"></div>
+        <div class="form-group"><label>Times (comma separated)</label><input type="text" id="schedTimes" value="08:00,12:00,18:00"></div>
+        <button class="btn-primary" onclick="addSched()">Save Schedule</button>
+      </details>
+    `);
+  } catch(e) {
+    qs('#schedList').innerHTML = `<p>Error: ${e.message}</p>`;
+  }
+}
+
+async function addSched() {
+  const name = qs('#schedName').value;
+  const times = qs('#schedTimes').value.split(',').map(t => t.trim()).filter(Boolean);
+  await api('POST', '/api/schedule', { name, times });
+  toast('Schedule saved!');
+  render();
+}
+
+async function deleteSched(name) {
+  await api('DELETE', '/api/schedule/' + name);
+  render();
+}
+
+// ── Accounts ───────────────────────────────────────────────
+async function renderAccounts() {
+  const app = qs('#app');
+  app.innerHTML = `<h1 class="page-header">Accounts</h1><p class="page-sub">Login once — cookies stored locally</p><div id="acctsList"></div>`;
+  try {
+    const accts = await api('GET', '/api/accounts');
+    for (const [plat, data] of Object.entries(accts)) {
+      const dot = data.status === 'connected' ? '●' : '○';
+      const clr = data.status === 'connected' ? '#3ecf8e' : '#5a5a5a';
+      const div = el('div', 'queue-card');
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:500;font-size:15px"><span style="color:${clr}">${dot}</span> ${plat.charAt(0).toUpperCase()+plat.slice(1)}</div>
+            <div style="font-size:12px;color:var(--ink-mute)">${data.status === 'connected' ? 'Connected' : 'Disconnected'} · ${data.message}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn-primary" style="flex:1" onclick="loginPlatform('${plat}')">Login ${plat.charAt(0).toUpperCase()+plat.slice(1)}</button>
+          <button class="btn-danger" style="flex:1" onclick="logoutPlatform('${plat}')">Logout</button>
+        </div>
+      `;
+      qs('#acctsList').appendChild(div);
+    }
+    qs('#acctsList').insertAdjacentHTML('beforeend', `
+      <hr>
+      <details>
+        <summary style="font-weight:600;font-size:14px;cursor:pointer;margin-bottom:12px">Tempel Cookies JSON (HP / Laptop)</summary>
+        <div class="form-group">
+          <label>Platform</label>
+          <select id="ckPlat"><option value="youtube">YouTube</option><option value="tiktok">TikTok</option><option value="facebook">Facebook</option></select>
+        </div>
+        <div class="form-group"><label>Cookies JSON</label><textarea id="ckJson" rows="5" placeholder='[{&quot;name&quot;:&quot;...&quot;,&quot;value&quot;:&quot;...&quot;}]' style="resize:vertical"></textarea></div>
+        <button class="btn-primary" onclick="saveCookies()">Simpan Cookies</button>
+      </details>
+    `);
+  } catch(e) {
+    qs('#acctsList').innerHTML = `<p>Error: ${e.message}</p>`;
+  }
+}
+
+async function loginPlatform(plat) {
+  await api('POST', '/api/accounts/login/' + plat);
+  toast(`Browser akan terbuka untuk login ${plat}. Cek jendela CMD yang muncul.`);
+}
+
+async function logoutPlatform(plat) {
+  await api('POST', '/api/accounts/logout/' + plat);
+  render();
+}
+
+async function saveCookies() {
+  const plat = qs('#ckPlat').value;
+  const json = qs('#ckJson').value.trim();
+  if (!json) { toast('Cookies tidak boleh kosong!'); return; }
+  try {
+    const cookies = JSON.parse(json);
+    if (!Array.isArray(cookies)) { toast('Format harus JSON array!'); return; }
+    await api('POST', '/api/accounts/cookies', { platform: plat, cookies });
+    toast(`Cookies untuk ${plat} berhasil disimpan!`);
+    render();
+  } catch(e) {
+    toast('Error parsing JSON: ' + e.message);
+  }
+}
+
+// ── Stats ──────────────────────────────────────────────────
+async function renderStats() {
+  const app = qs('#app');
+  try {
+    const stats = await api('GET', '/api/stats');
+    app.innerHTML = `
+      <h1 class="page-header">Stats</h1>
+      <p class="page-sub">Daily upload statistics</p>
+      <div class="dash-grid">
+        <div class="dash-card"><div class="dash-icon">📨</div><p class="dash-num">${stats.uploaded_today}</p><p class="dash-label">Uploaded Today</p></div>
+        <div class="dash-card"><div class="dash-icon">⏳</div><p class="dash-num dash-num-dark">${stats.remaining}</p><p class="dash-label">Remaining</p></div>
+        <div class="dash-card"><div class="dash-icon">📋</div><p class="dash-num dash-num-dark">${stats.in_queue}</p><p class="dash-label">In Queue</p></div>
+      </div>
+    `;
+  } catch(e) {
+    app.innerHTML = `<p>Error: ${e.message}</p>`;
+  }
+}
+
+// ── Navigation ─────────────────────────────────────────────
+function goPage(page) {
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+  state.page = page;
+  render();
+}
+
+qsa('.nav-item').forEach(b => b.onclick = () => goPage(b.dataset.page));
+
+qs('#ollamaModel').onchange = function() {
+  qs('#customModel').style.display = this.value === 'Custom' ? 'block' : 'none';
+};
+
+// ── Init ───────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>

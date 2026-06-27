@@ -32,7 +32,20 @@ class ViralMomentFinder:
         "ngakak","nangis","baper","semangat","motivasi","hebat","mantap","viral","parah","gokil"}
 
     @staticmethod
-    def find_moments(transcript: str, duration: float, word_ts: List[WordTimestamp]) -> List[ViralMoment]:
+    def find_moments(transcript: str, duration: float, word_ts: List[WordTimestamp],
+                     use_llm: bool = False, model_name: str = None) -> List[ViralMoment]:
+        if use_llm:
+            from core.llm import find_moments_with_llm
+            moments_raw = find_moments_with_llm(transcript, duration, model_name)
+            if moments_raw:
+                res = []
+                for m in moments_raw:
+                    res.append(ViralMoment(m["start_time"], m["end_time"], m["reason"], m["category"], ""))
+                words = transcript.split()
+                for m in res:
+                    m.transcript_snippet = " ".join(ViralMomentFinder._words_in_range(word_ts, words, duration, m.start_time, m.end_time))[:300]
+                return res
+
         if not transcript or duration <= 5:
             return [ViralMoment(0, min(duration,30), "Klip pendek", "KLIMAKS", transcript or "")]
         words = transcript.split()
