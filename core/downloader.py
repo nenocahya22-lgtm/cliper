@@ -66,6 +66,8 @@ def _get_platform_extractor_args(platform: str) -> dict:
     if platform == "youtube":
         args["youtube"] = {
             "player_client": ["android"],  # 1 client saja biar payload kecil
+            "skip": ["dash", "hls"],       # skip DASH/HLS manifest — kurangi response size
+            "player_skip": ["webpage", "configs"],  # skip webpage & config — kurangi API call
         }
     elif platform == "tiktok":
         args["tiktok"] = {
@@ -155,6 +157,8 @@ def _default_opts(url: str = "", **extra):
             print(f"[cookies] Gagal load cookies untuk {platform}: {e}")
 
     # curl_cffi sudah otomatis dipakai yt-dlp kalau terinstall (TLS fingerprint browser asli)
+    # Skip format checking — kurangi 1 API call (sering trigger 413 di cloud)
+    opts["check_formats"] = "none"  # string "none", bukan None!
 
     opts.update(extra)
     return opts
