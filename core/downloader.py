@@ -67,7 +67,6 @@ def _get_platform_extractor_args(platform: str) -> dict:
         args["youtube"] = {
             "player_client": ["android"],  # 1 client saja biar payload kecil
             "skip": ["dash", "hls"],       # skip DASH/HLS manifest — kurangi response size
-            "player_skip": ["webpage", "configs"],  # skip webpage & config — kurangi API call
         }
     elif platform == "tiktok":
         args["tiktok"] = {
@@ -206,16 +205,48 @@ class VideoDownloader:
         return ""
 
     @staticmethod
+    def _try_extract(ydl_opts: dict, url: str, label: str = "") -> dict:
+        """Coba extract info dengan opsi tertentu. Return {} kalau gagal."""
+        import yt_dlp
+        try:
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                return ydl.extract_info(url, download=False) or {}
+        except Exception as e:
+            err_str = str(e)
+            # 413 atau 403 — log dan lanjut fallback
+            if "413" in err_str or "403" in err_str:
+                print(f"[extract] {label} kena block ({err_str[:80]})")
+            else:
+                print(f"[extract] {label} gagal: {err_str[:80]}")
+            return {}
+
+    @staticmethod
+    def _extract_info_safe(url: str, platform: str = "") -> dict:
+        """
+        Multi-strategy extraction untuk bypass block di cloud server.
+        Coba berbagai kombinasi opsi sampai salah satu berhasil.
+        """
+        # Strategi A: tanpa cookies — penyebab utama 413 adalah cookies terlalu besar
+        opts_a = _default_opts(url)
+        opts_a.pop("cookiefile", None)
+        info = VideoDownloader._try_extract(opts_a, url, "tanpa cookies")
+        if info and info.get("title"):
+            return info
+
+        # Strategi B: dengan cookies (kalau ada, untuk video age-restricted)
+        opts_b = _default_opts(url)
+        info = VideoDownloader._try_extract(opts_b, url, "dengan cookies")
+        if info and info.get("title"):
+            return info
+
+        return {}
+
+    @staticmethod
     def download_audio(url: str, out: str, max_dur: float = 600) -> Tuple[str, str, float]:
         os.makedirs(out, exist_ok=True)
         _cleanup_part_files(out)
-        import yt_dlp
-        try:
-            with yt_dlp.YoutubeDL(_default_opts(url)) as ydl:
-                info = ydl.extract_info(url, download=False)
-        except Exception as e:
-            print(f"[download_audio] Gagal extract info: {e}")
-            info = {}
+        platform = _detect_platform(url)
+        info = VideoDownloader._extract_info_safe(url, platform)
         title = info.get("title","Unknown")
         dur = info.get("duration",0) or 0
         limit = min(dur or max_dur, max_dur)
