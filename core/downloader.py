@@ -57,12 +57,15 @@ def _detect_platform(url: str) -> str:
     return ""
 
 def _get_platform_extractor_args(platform: str) -> dict:
-    """Get platform-specific extractor_args."""
+    """Get platform-specific extractor_args.
+    
+    Gunakan sesedikit mungkin client untuk menghindari HTTP 413 (Request Entity Too Large)
+    di cloud server. Android client paling ringan dan jarang kena block.
+    """
     args = {}
     if platform == "youtube":
         args["youtube"] = {
-            "skip": ["dash", "hls"],
-            "player_client": ["android", "web", "ios", "web_safari"],
+            "player_client": ["android"],  # 1 client saja biar payload kecil
         }
     elif platform == "tiktok":
         args["tiktok"] = {
@@ -116,10 +119,11 @@ def _default_opts(url: str = "", **extra):
         "retries": 10,
         "fragment_retries": 10,
         "retry_sleep_functions": {"http": lambda n: 5},
-        "socket_timeout": 60,
-        "extractor_retries": 5,
-        "sleep_interval": 3,
-        "max_sleep_interval": 10,
+        "socket_timeout": 30,
+        "extractor_retries": 3,
+        "sleep_interval": 5,
+        "max_sleep_interval": 15,
+        "sleep_requests": 2,  # jeda antar request API biar gak kena rate limit
     }
 
     # Attach cookies if available for this platform
