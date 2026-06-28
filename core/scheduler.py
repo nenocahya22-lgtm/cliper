@@ -53,6 +53,14 @@ class Queue:
         return [i for i in db.queue_list() if i.get("status") == "pending"]
 
     @staticmethod
+    def delete(item_id: int):
+        db.queue_delete(item_id)
+
+    @staticmethod
+    def get(item_id: int) -> dict:
+        return db.queue_get(item_id)
+
+    @staticmethod
     def clear_done():
         db.queue_clear_done()
 

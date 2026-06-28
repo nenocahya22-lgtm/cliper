@@ -40,3 +40,22 @@ server.log
 # OS
 Thumbs.db
 .DS_Store
+
+# Auth users data
+data/users.json
+
+# Platform accounts (cookies)
+accounts/**/*.json
+
+# Output videos & temp files
+output/
+!output/.gitkeep
+
+# Environment files
+.env
+.env.local
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo

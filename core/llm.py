@@ -15,7 +15,14 @@ def _ask(prompt: str, max_tokens: int = 256, model_name: str = None) -> str:
         if r.status_code == 200:
             return r.json().get("response", "").strip()
         return ""
-    except:
+    except requests.exceptions.ConnectionError:
+        print(f"[LLM] Ollama tidak berjalan di {OLLAMA_URL}. Jalankan: ollama serve")
+        return ""
+    except requests.exceptions.Timeout:
+        print(f"[LLM] Ollama timeout setelah 180s")
+        return ""
+    except Exception as e:
+        print(f"[LLM] Error: {e}")
         return ""
 
 def generate_title(transcript: str, topik: str = "", model_name: str = None) -> str:

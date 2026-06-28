@@ -101,6 +101,19 @@ def queue_delete(item_id: int):
     q = [i for i in q if i["id"] != item_id]
     _local_write(str(QUEUE_DIR / "queue.json"), q)
 
+
+def queue_get(item_id: int) -> dict:
+    """Get single queue item by ID."""
+    sb = _get_supabase()
+    if sb:
+        r = sb.table("queue").select("*").eq("id", item_id).execute()
+        return r.data[0] if r.data else {}
+    q = _local_read(str(QUEUE_DIR / "queue.json")) or []
+    for item in q:
+        if item["id"] == item_id:
+            return item
+    return {}
+
 def queue_clear_done():
     sb = _get_supabase()
     if sb:
