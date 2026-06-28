@@ -872,6 +872,16 @@ def _get_user():
         return st.session_state.user
     return None
 
+def _fmt_time(seconds):
+    """Format detik ke MM:SS atau HH:MM:SS yang jelas."""
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    if h > 0:
+        return f"{h}:{m:02d}:{s:02d}"
+    return f"{m:02d}:{s:02d}"
+
+
 def _login_page():
     st.markdown("""
     <style>
@@ -1223,7 +1233,7 @@ def _page_curate():
                 <span style="font-weight:700;font-size:13px;color:var(--carbon);font-family:Arial,sans-serif">{m.category}</span>
                 <span class="badge badge-green">{d:.0f}s</span>
               </div>
-              <p style="margin:2px 0 0;font-size:11px;color:var(--ink-soft)">\U0001f504 Mulai: <strong>{int(m.start_time//60)}:{int(m.start_time%60):02d}</strong> \u2013 Selesai: <strong>{int(m.end_time//60)}:{int(m.end_time%60):02d}</strong> (durasi: {d:.0f}s)</p>
+              <p style="margin:2px 0 0;font-size:11px;color:var(--ink-soft)">\U0001f504 Mulai: <strong>{_fmt_time(m.start_time)}</strong> \u2013 Selesai: <strong>{_fmt_time(m.end_time)}</strong> (durasi: {d:.0f}s)</p>
               <p style="margin:2px 0 0;font-size:10px;color:var(--muted-indigo)">{m.reason}</p>
             </div>
           </div>
@@ -1259,8 +1269,8 @@ def _page_editor():
             st.markdown(f"""
             <div style="background:var(--periwinkle);padding:var(--sp-md);clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);box-shadow:inset 0 1px 0 rgba(255,255,255,0.2),inset 0 -1px 0 var(--chrome-indigo)">
               <p style="font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.3px;margin:0 0 6px">\u2139 Info</p>
-              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Mulai:</strong> {int(mom.start_time//60)}:{int(mom.start_time%60):02d}</p>
-              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Selesai:</strong> {int(mom.end_time//60)}:{int(mom.end_time%60):02d}</p>
+              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Mulai:</strong> {_fmt_time(mom.start_time)}</p>
+              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Selesai:</strong> {_fmt_time(mom.end_time)}</p>
               <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Durasi:</strong> {mom.end_time-mom.start_time:.0f}s</p>
               <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Kategori:</strong> {mom.category}</p>
             </div>

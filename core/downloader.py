@@ -76,9 +76,10 @@ def _get_platform_extractor_args(platform: str) -> dict:
     return args
 
 def _get_platform_headers(platform: str) -> dict:
-    ua_chrome = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
-    ua_android = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
-    ua_iphone = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1"
+    # Chrome 130+ — pakai versi terbaru biar gak dicurigai bot
+    ua_chrome = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36"
+    ua_android = "Mozilla/5.0 (Linux; Android 15; Pixel 9 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Mobile Safari/537.36"
+    ua_iphone = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.4 Mobile/15E148 Safari/604.1"
 
     headers = {
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -149,6 +150,8 @@ def _default_opts(url: str = "", **extra):
         except Exception as e:
             print(f"[cookies] Gagal load cookies untuk {platform}: {e}")
 
+    # curl_cffi sudah otomatis dipakai yt-dlp kalau terinstall (TLS fingerprint browser asli)
+
     opts.update(extra)
     return opts
 
@@ -208,22 +211,27 @@ class VideoDownloader:
         title = info.get("title","Unknown")
         dur = info.get("duration",0) or 0
         limit = min(dur or max_dur, max_dur)
+        # Strategi #1: native yt-dlp (pakai headers/cookies bawaan, TLS fingerprint lebih baik)
         opts = _default_opts(url,
             format="bestaudio/best",
             outtmpl=os.path.join(out, "audio_%(id)s.%(ext)s"),
             postprocessors=[{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
-            external_downloader="ffmpeg",
-            external_downloader_args={"ffmpeg": ["-ss", "0", "-t", str(limit)]},
         )
         try:
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([url])
         except Exception as e:
-            print(f"[download_audio] Download gagal (fallback ke internal): {e}")
-            opts.pop("external_downloader", None)
-            opts.pop("external_downloader_args", None)
+            print(f"[download_audio] Native yt-dlp gagal, coba dengan ffmpeg downloader: {e}")
+            # Strategi #2: fallback ke ffmpeg downloader (lebih lambat tapi kadang work)
             try:
-                with yt_dlp.YoutubeDL(opts) as ydl:
+                opts2 = _default_opts(url,
+                    format="bestaudio/best",
+                    outtmpl=os.path.join(out, "audio_%(id)s.%(ext)s"),
+                    postprocessors=[{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
+                    external_downloader="ffmpeg",
+                    external_downloader_args={"ffmpeg": ["-ss", "0", "-t", str(limit)]},
+                )
+                with yt_dlp.YoutubeDL(opts2) as ydl:
                     ydl.download([url])
             except Exception as e2:
                 print(f"[download_audio] Download gagal total: {e2}")
@@ -254,6 +262,23 @@ class VideoDownloader:
         return ("", title, dur)
 
     @staticmethod
+    def _trim_to_clip(source_path: str, final_path: str, stt: float, dur: float) -> str:
+        """Trim source video ke segmen yang diinginkan pakai ffmpeg."""
+        if not source_path or not Path(source_path).exists():
+            return ""
+        if Path(source_path).stat().st_size == 0:
+            return ""
+        if source_path == final_path or Path(final_path).exists():
+            return final_path
+        r = subprocess.run([FFMPEG_PATH, "-y", "-ss", str(stt), "-i", source_path,
+            "-t", str(dur), "-c:v", "libx264", "-c:a", "aac", "-preset", "fast", final_path],
+            capture_output=True, text=True)
+        if Path(final_path).exists() and Path(final_path).stat().st_size > 0:
+            return final_path
+        print(f"[trim] Gagal trim: {r.stderr[:200]}")
+        return source_path  # fallback: return source as-is
+
+    @staticmethod
     def download_video_clip(url: str, out: str, stt: float=0, ett: float=60) -> str:
         os.makedirs(out, exist_ok=True)
         _cleanup_part_files(out)
@@ -261,43 +286,55 @@ class VideoDownloader:
         cid = str(uuid.uuid4())[:8]
         final = os.path.join(out, f"clip_{cid}.mp4")
         dur = ett - stt
-        opts = _default_opts(url,
+
+        # Strategi #1: native yt-dlp — download FULL video dulu (headers/cookies jalan)
+        full_raw = os.path.join(out, f"full_{cid}.%(ext)s")
+        full_opts = _default_opts(url,
             format="bestvideo[height<=1080][fps<=60]+bestaudio/best[height<=1080][fps<=60]",
-            outtmpl=os.path.join(out, f"raw_{cid}.%(ext)s"),
+            outtmpl=full_raw,
             merge_output_format="mp4",
-            external_downloader="ffmpeg",
-            external_downloader_args={"ffmpeg": ["-ss", str(stt), "-t", str(dur)]},
         )
         try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
+            with yt_dlp.YoutubeDL(full_opts) as ydl:
                 ydl.download([url])
         except Exception as e:
-            print(f"[download_video_clip] Download gagal (fallback ke internal): {e}")
-            opts.pop("external_downloader", None)
-            opts.pop("external_downloader_args", None)
+            print(f"[download_video_clip] Native yt-dlp gagal, coba ffmpeg downloader: {e}")
+            # Strategi #2: fallback — ffmpeg downloader langsung segment
+            ff_opts = _default_opts(url,
+                format="bestvideo[height<=1080][fps<=60]+bestaudio/best[height<=1080][fps<=60]",
+                outtmpl=os.path.join(out, f"raw_{cid}.%(ext)s"),
+                merge_output_format="mp4",
+                external_downloader="ffmpeg",
+                external_downloader_args={"ffmpeg": ["-ss", str(stt), "-t", str(dur)]},
+            )
             try:
-                with yt_dlp.YoutubeDL(opts) as ydl:
+                with yt_dlp.YoutubeDL(ff_opts) as ydl:
                     ydl.download([url])
             except Exception as e2:
                 print(f"[download_video_clip] Download gagal total: {e2}")
+                _cleanup_cookie_files()
                 return ""
-        rfs = sorted(Path(out).glob(f"raw_{cid}.*"))
+            # Trim hasil ffmpeg download
+            rfs = sorted(Path(out).glob(f"raw_{cid}.*"))
+            if rfs:
+                rf = str(rfs[0])
+                if Path(rf).stat().st_size > 0:
+                    result = VideoDownloader._trim_to_clip(rf, final, 0, dur)
+                    _cleanup_cookie_files()
+                    return result
+            _cleanup_cookie_files()
+            return ""
+
+        # Strategi #1 berhasil — trim hasil full video ke segmen
+        rfs = sorted(Path(out).glob(f"full_{cid}.*"))
         if not rfs:
-            print(f"[download_video_clip] Tidak ada file hasil download untuk {cid}")
+            print(f"[download_video_clip] Tidak ada file full_{cid}.*")
+            _cleanup_cookie_files()
             return ""
         rf = str(rfs[0])
-        if Path(rf).stat().st_size == 0:
-            print(f"[download_video_clip] File hasil download kosong: {rf}")
-            return ""
-        if rf != final:
-            r = subprocess.run([FFMPEG_PATH,"-y","-ss",str(stt),"-i",rf,
-                "-t",str(dur),"-c:v","libx264","-c:a","aac","-preset","fast",final],
-                capture_output=True, text=True)
-            if not Path(final).exists():
-                print(f"[download_video_clip] Gagal trim/clip video: {r.stderr[:200]}")
-                return rf
+        result = VideoDownloader._trim_to_clip(rf, final, stt, dur)
         _cleanup_cookie_files()
-        return final if Path(final).exists() else rf
+        return result
 
     @staticmethod
     def extract_audio_from_local(video_path: str, out: str) -> Tuple[str, float]:

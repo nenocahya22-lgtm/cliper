@@ -91,9 +91,30 @@ class ViralMomentFinder:
                 return res
 
         if not transcript or duration <= 5:
+            # Fallback: kalau transkrip kosong tapi durasi panjang, buat beberapa segmen pendek
+            if duration > 60:
+                num_segments = min(6, max(2, int(duration / 60)))
+                seg_width = 60  # tiap segmen maks 60 detik
+                spacing = duration / num_segments
+                segments = []
+                for i in range(num_segments):
+                    s = i * spacing
+                    e = min(s + seg_width, duration)
+                    segments.append(ViralMoment(s, e, f"Segmen {i+1}", "AUTO", transcript or ""))
+                return segments
             return [ViralMoment(0, min(duration,30), "Klip pendek", "KLIMAKS", transcript or "")]
         words = transcript.split()
         if len(words) < 5:
+            if duration > 60:
+                num_segments = min(6, max(2, int(duration / 60)))
+                seg_width = 60
+                spacing = duration / num_segments
+                segments = []
+                for i in range(num_segments):
+                    s = i * spacing
+                    e = min(s + seg_width, duration)
+                    segments.append(ViralMoment(s, e, f"Segmen {i+1}", "AUTO", transcript))
+                return segments
             return [ViralMoment(0, min(duration,30), "Video dengan sedikit teks", "KLIMAKS", transcript)]
 
         num = min(8, max(3, int(duration/15)))
