@@ -1257,25 +1257,6 @@ def _page_editor():
     st.markdown(f'<p class="page-sub">{mom.category} \u2014 {mom.reason}</p>', unsafe_allow_html=True)
     _step_bar(4)
 
-    # ── Video Preview Monitor ─────────────────────────────────
-    if res and res.video_path and Path(res.video_path).exists():
-        st.markdown('<p style="font-size:11px;font-weight:700;margin:0 0 var(--sp-xs);text-transform:uppercase;letter-spacing:0.3px;color:var(--ink-soft)">\U0001f4fd Preview</p>', unsafe_allow_html=True)
-        col_vid1, col_vid2 = st.columns([3, 1])
-        with col_vid1:
-            st.video(res.video_path)
-        with col_vid2:
-            md = min(max(mom.end_time-mom.start_time, 5), 120)
-            dur = float(res.duration)
-            st.markdown(f"""
-            <div style="background:var(--periwinkle);padding:var(--sp-md);clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);box-shadow:inset 0 1px 0 rgba(255,255,255,0.2),inset 0 -1px 0 var(--chrome-indigo)">
-              <p style="font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.3px;margin:0 0 6px">\u2139 Info</p>
-              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Mulai:</strong> {_fmt_time(mom.start_time)}</p>
-              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Selesai:</strong> {_fmt_time(mom.end_time)}</p>
-              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Durasi:</strong> {mom.end_time-mom.start_time:.0f}s</p>
-              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Kategori:</strong> {mom.category}</p>
-            </div>
-            """, unsafe_allow_html=True)
-
     c1, c2 = st.columns(2)
     md = min(max(mom.end_time-mom.start_time, 5), 120)
     dur = float(res.duration)
@@ -1294,6 +1275,73 @@ def _page_editor():
       <div style="font-size:10px;color:var(--ink-soft);margin-top:4px;font-weight:700">Clip: {clip_dur:.1f}s / Total: {dur:.0f}s</div>
     </div>
     """, unsafe_allow_html=True)
+
+    # ── Video Preview — 9:16 Portrait (YouTube Shorts) ─────────
+    if res and res.video_path and Path(res.video_path).exists():
+        st.markdown(
+            '<p style="font-size:11px;font-weight:700;margin:var(--sp-lg) 0 var(--sp-xs);text-transform:uppercase;letter-spacing:0.3px;color:var(--ink-soft)">'
+            '\U0001f4fd Preview Clip (9:16 Portrait)'
+            '</p>',
+            unsafe_allow_html=True
+        )
+
+        # Generate preview clip — nama file deterministic (dari start/end)
+        # Biar gak regenerate tiap kali user ubah slider
+        preview_path = os.path.join(st.session_state.wd, f"preview_{int(sv)}_{int(ev)}.mp4")
+        preview_ready = Path(preview_path).exists()
+
+        if not preview_ready and not st.session_state.get("_rendering_preview", False):
+            st.session_state._rendering_preview = True
+            try:
+                subprocess.run([
+                    "ffmpeg", "-y",
+                    "-ss", str(sv), "-i", res.video_path,
+                    "-t", str(min(clip_dur, 30)),
+                    "-vf", "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30",
+                    "-c:a", "aac", "-b:a", "64k", "-ac", "1",
+                    preview_path
+                ], capture_output=True, text=True, timeout=30)
+                preview_ready = Path(preview_path).exists()
+            except:
+                pass
+            st.session_state._rendering_preview = False
+
+        col_vid1, col_vid2 = st.columns([2, 1])
+        with col_vid1:
+            if preview_ready:
+                # Pakai st.video (support path lokal) + CSS untuk 9:16
+                st.markdown(
+                    '<style>'
+                    'video[data-testid="stVideo"] { aspect-ratio: 9/16 !important; max-width: 360px !important; object-fit: cover; }'
+                    '[data-testid="stVideo"] { max-width: 360px !important; margin: 0 auto; }'
+                    '</style>',
+                    unsafe_allow_html=True
+                )
+                st.video(preview_path)
+            else:
+                st.markdown(
+                    '<div style="text-align:center;font-size:10px;color:var(--muted-indigo);font-weight:700;margin:20px 0">'
+                    '\u23f3 Menyiapkan preview 9:16...'
+                    '</div>',
+                    unsafe_allow_html=True
+                )
+                st.video(res.video_path)
+
+        with col_vid2:
+            st.markdown(f"""
+            <div style="background:var(--periwinkle);padding:var(--sp-md);clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);box-shadow:inset 0 1px 0 rgba(255,255,255,0.2),inset 0 -1px 0 var(--chrome-indigo)">
+              <p style="font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.3px;margin:0 0 6px">\u2139 Info</p>
+              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Mulai:</strong> {_fmt_time(sv)}</p>
+              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Selesai:</strong> {_fmt_time(ev)}</p>
+              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Durasi:</strong> {clip_dur:.0f}s</p>
+              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Kategori:</strong> {mom.category}</p>
+              <hr style="margin:8px 0;border:none;border-top:1px dotted var(--muted-indigo)">
+              <p style="font-size:9px;color:var(--muted-indigo);margin:0;line-height:1.3">
+                \u26a0 Preview ini hanya klip mentah. Efek, subtitle, transisi, teks overlay, dll akan terlihat <strong>setelah Render</strong>.
+              </p>
+            </div>
+            """, unsafe_allow_html=True)
     tabs = st.tabs(["Visual & Effects", "Transitions & Speed", "CapCut Pro", "Text Overlay", "Subtitles", "Audio", "Title & Upload"])
     with tabs[0]:
         col1, col2, col3 = st.columns(3)
