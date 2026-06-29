@@ -1312,15 +1312,34 @@ def _page_editor():
         col_vid1, col_vid2 = st.columns([2, 1])
         with col_vid1:
             if preview_ready:
-                # Pakai st.video (support path lokal) + CSS untuk 9:16
+                # ── Real-time preview seperti CapCut ─────────────────
+                # Video container + CSS filter (INSTAN, tanpa ffmpeg)
                 st.markdown(
                     '<style>'
                     'video[data-testid="stVideo"] { aspect-ratio: 9/16 !important; max-width: 360px !important; object-fit: cover; }'
                     '[data-testid="stVideo"] { max-width: 360px !important; margin: 0 auto; }'
+                    
+                    
                     '</style>',
                     unsafe_allow_html=True
                 )
                 st.video(preview_path)
+                # Text overlay preview (real-time, langsung kelihatan)
+                # Muncul di bawah video, distyling seperti overlay gelap
+                try:
+                    _ov = text_overlay or ""
+                except NameError:
+                    _ov = ""
+                if _ov.strip():
+                    _ov_escaped = _ov.strip().replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                    _ov_html = _ov_escaped.replace(chr(10), '<br>')
+                    st.markdown(
+                        f'<div style="background:rgba(0,0,0,0.7);color:white;padding:12px 16px;'
+                        f'margin-top:4px;font-size:16px;font-weight:700;text-align:center;'
+                        f'clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);'
+                        f'border-left:3px solid var(--signal,#f68d1f)">{_ov_html}</div>',
+                        unsafe_allow_html=True
+                    )
             else:
                 st.markdown(
                     '<div style="text-align:center;font-size:10px;color:var(--muted-indigo);font-weight:700;margin:20px 0">'
@@ -1445,6 +1464,30 @@ def _page_editor():
         if post_facebook: platforms.append("facebook")
         apst = st.checkbox("Auto-Post ke akun tertaut setelah render", value=False)
         auto_delete = st.checkbox("Auto-delete video setelah semua platform terupload", value=True)
+    # ── Real-time CSS filter preview (CapCut-style) ────────────
+    filter_parts = []
+    if cnt != 1.0:
+        filter_parts.append(f"contrast({cnt})")
+    if brg != 0.0:
+        filter_parts.append(f"brightness({1.0 + brg})")
+    if sat != 1.0:
+        filter_parts.append(f"saturate({sat})")
+    if sep:
+        filter_parts.append("sepia(1)")
+    if gry:
+        filter_parts.append("grayscale(1)")
+    filter_str = " ".join(filter_parts) if filter_parts else "none"
+    mirror_css = "scaleX(-1)" if mr else "none"
+    st.markdown(
+        f'<style>'
+        f'video[data-testid="stVideo"] {{ '
+        f'  filter: {filter_str} !important; '
+        f'  transform: {mirror_css} !important; '
+        f'}}'
+        f'</style>',
+        unsafe_allow_html=True
+    )
+
     col_render, col_previewfx = st.columns(2)
     if col_render.button("\U0001f3ac Render Clip", type="primary", use_container_width=True, disabled=st.session_state.rendering):
         st.session_state.rendering = True
@@ -1470,6 +1513,7 @@ def _page_editor():
     # ── Preview Effects — render 3 detik dengan semua efek ────────
     if col_previewfx.button("\U0001f441 Preview Effects", use_container_width=True, type="secondary", disabled=st.session_state.rendering):
         st.session_state.rendering = True
+        st.session_state.render_done = False
         st.session_state.render_progress = 0.0
         st.session_state.render_step = "\U0001f441 Merender preview efek..."
         threading.Thread(target=_preview_effects, args=(
