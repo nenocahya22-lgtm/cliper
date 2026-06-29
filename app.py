@@ -955,6 +955,8 @@ def _init_state():
     keys_default = {
         "result": None, "sel_moment": None, "out_video": None,
         "processing": False, "rendering": False,
+        "render_progress": 0.0, "render_step": "", "render_done": False,
+        "preview_fx_path": None,
         "step": 1, "src": "url", "page": "dashboard",
         "edit_queue_id": None, "clips_page": 1, "vurl": "", "farm_url": "",
         "user": None, "sidebar_open": False,
@@ -1443,42 +1445,120 @@ def _page_editor():
         if post_facebook: platforms.append("facebook")
         apst = st.checkbox("Auto-Post ke akun tertaut setelah render", value=False)
         auto_delete = st.checkbox("Auto-delete video setelah semua platform terupload", value=True)
-    if st.button("Render Clip", type="primary", use_container_width=True, disabled=st.session_state.rendering):
+    col_render, col_previewfx = st.columns(2)
+    if col_render.button("\U0001f3ac Render Clip", type="primary", use_container_width=True, disabled=st.session_state.rendering):
         st.session_state.rendering = True
-        _do_render(
+        st.session_state.render_done = False
+        st.session_state.render_progress = 0.0
+        st.session_state.render_step = "\U0001f4e6 Menyiapkan render..."
+        st.session_state.preview_fx_path = None
+        threading.Thread(target=_do_render_thread, args=(
             sv, ev, sb, sc, fi, fo, asp, sp, mr, cf, nr, j, d,
-            contrast=cnt, brightness=brg, saturation=sat,
-            vignette=vig, sepia=sep, grayscale=gry, sharpen=shp, edge_detect=edg,
-            sub_size=sub_sz, sub_font=sub_fnt, sub_align=sub_alg, sub_upper=sub_upp,
-            auto_post=apst, platforms=platforms, auto_delete=auto_delete,
-            transition=trans, speed_ramp=speed_ramp, text_overlay=text_overlay,
-            glitch=glict, bg_music=bg_music, music_volume=music_vol,
-            # ── New CapCut Features ────────────────────────────────
-            reverse=rev,
-            chroma_key=ck_color, chroma_similarity=ck_sim, chroma_blend=ck_blend,
-            ken_burns=ken, ken_zoom_start=ken_start, ken_zoom_end=ken_end,
-            blur_bg=blur,
-            stabilize=stab, stabilize_shakiness=stab_shake,
+            cnt, brg, sat,
+            vig, sep, gry, shp, edg,
+            sub_sz, sub_fnt, sub_alg, sub_upp,
+            apst, platforms, auto_delete,
+            trans, speed_ramp, text_overlay,
+            glict, bg_music, music_vol,
+            rev,
+            ck_color, ck_sim, ck_blend,
+            ken, ken_start, ken_end,
+            blur,
+            stab, stab_shake,
+        ), daemon=True).start()
+
+    # ── Preview Effects — render 3 detik dengan semua efek ────────
+    if col_previewfx.button("\U0001f441 Preview Effects", use_container_width=True, type="secondary", disabled=st.session_state.rendering):
+        st.session_state.rendering = True
+        st.session_state.render_progress = 0.0
+        st.session_state.render_step = "\U0001f441 Merender preview efek..."
+        threading.Thread(target=_preview_effects, args=(
+            sv, ev, sb, sc, fi, fo, asp, sp, mr, cf, nr,
+            cnt, brg, sat,
+            vig, sep, gry, shp, edg,
+            sub_sz, sub_fnt, sub_alg, sub_upp,
+            trans, speed_ramp, text_overlay,
+            glict, bg_music, music_vol,
+            rev,
+            ck_color, ck_sim, ck_blend,
+            ken, ken_start, ken_end,
+            blur,
+            stab, stab_shake,
+        ), daemon=True).start()
+
+    # ── Render Progress ────────────────────────────────────────────
+    if st.session_state.rendering:
+        prog_val = st.session_state.render_progress
+        step_msg = st.session_state.render_step
+        st.progress(prog_val)
+        st.markdown(
+            f'<div style="background:var(--periwinkle);padding:var(--sp-md);clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);box-shadow:inset 0 1px 0 rgba(255,255,255,0.2),inset 0 -1px 0 var(--chrome-indigo)">'
+            f'<p style="font-size:11px;color:var(--carbon);font-weight:700;margin:0">{step_msg}</p>'
+            f'<p style="font-size:10px;color:var(--muted-indigo);margin:4px 0 0">{prog_val*100:.0f}%</p>'
+            f'</div>',
+            unsafe_allow_html=True
         )
 
-def _do_render(stt, ett, show_sub, sub_col, fi, fo, aspect, speed_str, mirror, color_f, noise_r, title, desc,
-               contrast=1.0, brightness=0.0, saturation=1.0,
-               vignette=False, sepia=False, grayscale=False, sharpen=False, edge_detect=False,
-               sub_size=44, sub_font="Montserrat", sub_align=5, sub_upper=True,
-               auto_post=False, platforms=None, auto_delete=True,
-               transition="none", speed_ramp="none", text_overlay="",
-               glitch=False, bg_music="", music_volume=0.3,
-               # ── New CapCut Features ────────────────────────────────
-               reverse=False,
-               chroma_key="", chroma_similarity=0.4, chroma_blend=0.1,
-               ken_burns=False, ken_zoom_start=1.0, ken_zoom_end=1.3,
-               blur_bg="none",
-               stabilize=False, stabilize_shakiness=5):
+    # ── Render Result (inline setelah render selesai) ────────────
+    if st.session_state.render_done and st.session_state.out_video:
+        ov = st.session_state.out_video
+        if Path(ov).exists():
+            sz = Path(ov).stat().st_size / (1024*1024)
+            st.markdown(
+                '<div style="background:var(--sky);padding:var(--sp-md);clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);box-shadow:inset 0 1px 0 rgba(255,255,255,0.3),inset 0 -1px 0 var(--systems-teal);margin-bottom:var(--sp-lg)">'
+                '<p style="font-size:13px;font-weight:900;color:var(--carbon);margin:0 0 2px">\u2714\ufe0f Render Selesai!</p>'
+                f'<p style="font-size:10px;color:var(--ink-soft);margin:0">{os.path.basename(ov)} \u2022 {sz:.1f} MB</p>'
+                '</div>',
+                unsafe_allow_html=True
+            )
+            st.video(str(ov))
+            r1, r2, r3 = st.columns(3)
+            if r1.button("\U0001f4dd Lanjut ke Preview", type="primary", use_container_width=True):
+                st.session_state.step = 5
+                st.rerun()
+            if r2.button("\U0001f4e4 Upload ke YouTube", use_container_width=True):
+                try:
+                    Uploader.upload("youtube", ov, st.session_state.get("_title", ""), st.session_state.get("_desc", ""))
+                    st.toast("\u2713 Terupload!")
+                except Exception as e:
+                    st.error(f"Gagal: {e}")
+            if r3.button("\u2795 Render Lagi", use_container_width=True):
+                st.session_state.render_done = False
+                st.session_state.out_video = None
+                st.rerun()
+
+    # ── Preview Effects Result (inline) ─────────────────────────
+    fx_preview = st.session_state.get("preview_fx_path")
+    if fx_preview and Path(fx_preview).exists() and not st.session_state.rendering:
+        st.markdown(
+            '<div style="background:var(--periwinkle);padding:var(--sp-md);clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);margin-bottom:var(--sp-sm)">'
+            '<p style="font-size:11px;font-weight:700;color:var(--carbon);margin:0">\U0001f441 Preview Efek</p>'
+            '<p style="font-size:9px;color:var(--muted-indigo);margin:2px 0 0">Preview 3 detik dengan efek saat ini</p>'
+            '</div>',
+            unsafe_allow_html=True
+        )
+        st.video(str(fx_preview))
+
+def _do_render_thread(
+    stt, ett, show_sub, sub_col, fi, fo, aspect, speed_str, mirror, color_f, noise_r, title, desc,
+    contrast=1.0, brightness=0.0, saturation=1.0,
+    vignette=False, sepia=False, grayscale=False, sharpen=False, edge_detect=False,
+    sub_size=44, sub_font="Montserrat", sub_align=5, sub_upper=True,
+    auto_post=False, platforms=None, auto_delete=True,
+    transition="none", speed_ramp="none", text_overlay="",
+    glitch=False, bg_music="", music_volume=0.3,
+    reverse=False,
+    chroma_key="", chroma_similarity=0.4, chroma_blend=0.1,
+    ken_burns=False, ken_zoom_start=1.0, ken_zoom_end=1.3,
+    blur_bg="none",
+    stabilize=False, stabilize_shakiness=5
+):
+    """Render clip — dijalankan di background thread. Update session state untuk progress."""
     res = st.session_state.get("result")
     if not res:
+        st.session_state.rendering = False
+        st.session_state.render_step = "\u2716 Error: tidak ada result video"
         return
-    sts = st.empty()
-    prg = st.progress(0)
     wd = st.session_state.wd
     cid = uuid.uuid4().hex[:8]
     out = os.path.join(wd, f"out_{cid}.mp4")
@@ -1486,8 +1566,8 @@ def _do_render(stt, ett, show_sub, sub_col, fi, fo, aspect, speed_str, mirror, c
     src = st.session_state.get("src", "url")
     speed = {"1.0x":1.0,"1.05x":1.05,"1.07x":1.07,"1.1x":1.1,"1.15x":1.15}.get(speed_str, 1.0)
     try:
-        sts.markdown(f'<div style="display:flex;align-items:center;gap:var(--sp-sm);margin-bottom:var(--sp-md)"><div class="skeleton" style="width:16px;height:16px"></div><span style="color:var(--ink-soft);font-size:12px;font-weight:700">Preparing...</span></div>', unsafe_allow_html=True)
-        prg.progress(0.1)
+        st.session_state.render_progress = 0.05
+        st.session_state.render_step = "\U0001f4e6 Menyiapkan klip video..."
         clip_path = None
         if src == "url":
             clip_path = VideoDownloader.download_video_clip(st.session_state.get("vurl",""), wd, stt, ett)
@@ -1500,14 +1580,17 @@ def _do_render(stt, ett, show_sub, sub_col, fi, fo, aspect, speed_str, mirror, c
                     clip_path = res.video_path
         if not clip_path:
             raise Exception("No video source")
-        prg.progress(0.3)
+
+        st.session_state.render_progress = 0.25
+        st.session_state.render_step = "\U0001f4dd Membuat subtitle..."
         if show_sub and res.word_timestamps:
             rel = [wt for wt in res.word_timestamps if wt.start<ett and wt.end>stt]
             if rel:
                 shifted = [WordTimestamp(w.word, max(0,w.start-stt), w.end-stt) for w in rel]
                 SubtitleGenerator.generate_ass(shifted, sub_path, SUBTITLE_COLORS.get(sub_col,"&H00FFFF&"), font=sub_font, size=sub_size, alignment=sub_align, uppercase=sub_upper)
-        prg.progress(0.5)
-        sts.markdown(f'<div style="display:flex;align-items:center;gap:var(--sp-sm);margin-bottom:var(--sp-md)"><div class="skeleton" style="width:16px;height:16px"></div><span style="color:var(--ink-soft);font-size:12px;font-weight:700">Rendering... {speed}x {color_f}</span></div>', unsafe_allow_html=True)
+
+        st.session_state.render_progress = 0.5
+        st.session_state.render_step = f"\U0001f3ac Merender video... {speed}x {color_f}"
         ok, err = VideoProcessor.process_clip(
             clip_path, out,
             sub_path if Path(sub_path).exists() else "", "",
@@ -1516,7 +1599,6 @@ def _do_render(stt, ett, show_sub, sub_col, fi, fo, aspect, speed_str, mirror, c
             vignette=vignette, sepia=sepia, grayscale=grayscale, sharpen=sharpen, edge_detect=edge_detect,
             transition=transition, text_overlay=text_overlay,
             speed_ramp=speed_ramp, glitch=glitch, bg_music=bg_music, music_volume=music_volume,
-            # ── New CapCut Features ────────────────────────────────
             reverse=reverse,
             chroma_key=chroma_key, chroma_similarity=chroma_similarity, chroma_blend=chroma_blend,
             ken_burns=ken_burns, ken_zoom_start=ken_zoom_start, ken_zoom_end=ken_zoom_end,
@@ -1525,17 +1607,21 @@ def _do_render(stt, ett, show_sub, sub_col, fi, fo, aspect, speed_str, mirror, c
         )
         if not ok:
             raise Exception(err)
-        prg.progress(1.0)
+
+        st.session_state.render_progress = 0.9
+        st.session_state.render_step = "\U0001f4be Menyimpan hasil..."
         safe_title = "".join(c if c.isalnum() or c in " _-" else "_" for c in title)[:30]
         ts = time.strftime("%Y%m%d_%H%M%S")
         final_name = f"{ts}_{safe_title}.mp4"
         final_path = os.path.join(OUTPUT_DIR, final_name)
         shutil.copy2(out, final_path)
         st.session_state.out_video = final_path
-        st.session_state.rendering = False
-        st.session_state.step = 5
         st.session_state._title = title
         st.session_state._desc = desc
+
+        st.session_state.render_progress = 1.0
+        st.session_state.render_step = "\u2714\ufe0f Render selesai!"
+
         user = st.session_state.get("user", {})
         clip_id = db.clip_save(
             final_path, title=title, description=desc,
@@ -1544,6 +1630,7 @@ def _do_render(stt, ett, show_sub, sub_col, fi, fo, aspect, speed_str, mirror, c
             user_id=user.get("id", "")
         )
         st.session_state._clip_id = clip_id
+
         if auto_post and platforms:
             target_platforms = [p for p in platforms if _account_status(p)[0] == "connected"]
             if target_platforms:
@@ -1560,11 +1647,72 @@ def _do_render(stt, ett, show_sub, sub_col, fi, fo, aspect, speed_str, mirror, c
                     if auto_delete:
                         db.clips_cleanup_uploaded()
                 threading.Thread(target=bg_upload, daemon=True).start()
-                st.toast(f"Auto-Post ke {', '.join(target_platforms)} dimulai!")
-        st.rerun()
+
     except Exception as e:
-        st.error(str(e))
+        st.session_state.render_step = f"\u2716 Error: {e}"
+        st.session_state.render_progress = 0.0
+    finally:
         st.session_state.rendering = False
+        st.session_state.render_done = True
+
+def _preview_effects(
+    stt, ett, show_sub, sub_col, fi, fo, aspect, speed_str, mirror, color_f, noise_r,
+    contrast=1.0, brightness=0.0, saturation=1.0,
+    vignette=False, sepia=False, grayscale=False, sharpen=False, edge_detect=False,
+    sub_size=44, sub_font="Montserrat", sub_align=5, sub_upper=True,
+    transition="none", speed_ramp="none", text_overlay="",
+    glitch=False, bg_music="", music_volume=0.3,
+    reverse=False,
+    chroma_key="", chroma_similarity=0.4, chroma_blend=0.1,
+    ken_burns=False, ken_zoom_start=1.0, ken_zoom_end=1.3,
+    blur_bg="none",
+    stabilize=False, stabilize_shakiness=5
+):
+    """Render preview 3 detik dengan efek — biar user bisa lihat hasil edit sebelum render penuh."""
+    res = st.session_state.get("result")
+    if not res or not res.video_path or not Path(res.video_path).exists():
+        st.session_state.render_step = "\u2716 Error: video source tidak ditemukan"
+        st.session_state.rendering = False
+        return
+    wd = st.session_state.wd
+    preview_fx = os.path.join(wd, "preview_fx.mp4")
+    sub_path = os.path.join(wd, "preview_fx_subs.ass")
+    speed = {"1.0x":1.0,"1.05x":1.05,"1.07x":1.07,"1.1x":1.1,"1.15x":1.15}.get(speed_str, 1.0)
+    clip_dur = min(4, ett - stt)  # Cuma 4 detik preview
+    try:
+        st.session_state.render_step = "\u23f3 Merender preview efek..."
+        st.session_state.render_progress = 0.3
+        if show_sub and res.word_timestamps:
+            rel = [wt for wt in res.word_timestamps if wt.start<ett and wt.end>stt]
+            if rel:
+                shifted = [WordTimestamp(w.word, max(0,w.start-stt), w.end-stt) for w in rel]
+                SubtitleGenerator.generate_ass(shifted, sub_path, SUBTITLE_COLORS.get(sub_col,"&H00FFFF&"), font=sub_font, size=sub_size, alignment=sub_align, uppercase=sub_upper)
+        st.session_state.render_progress = 0.6
+        ok, err = VideoProcessor.process_clip(
+            res.video_path, preview_fx,
+            sub_path if Path(sub_path).exists() else "", "",
+            stt, stt+clip_dur, min(fi, 0.3), min(fo, 0.3), speed, mirror, color_f, noise_r, aspect=aspect,
+            contrast=contrast, brightness=brightness, saturation=saturation,
+            vignette=vignette, sepia=sepia, grayscale=grayscale, sharpen=sharpen, edge_detect=edge_detect,
+            transition=transition, text_overlay=text_overlay,
+            speed_ramp=speed_ramp, glitch=glitch, bg_music=bg_music, music_volume=music_volume,
+            reverse=reverse,
+            chroma_key=chroma_key, chroma_similarity=chroma_similarity, chroma_blend=chroma_blend,
+            ken_burns=ken_burns, ken_zoom_start=ken_zoom_start, ken_zoom_end=ken_zoom_end,
+            blur_bg=blur_bg,
+            stabilize=stabilize, stabilize_shakiness=stabilize_shakiness
+        )
+        if ok:
+            st.session_state.preview_fx_path = preview_fx
+            st.session_state.render_step = "\u2714\ufe0f Preview efek siap!"
+        else:
+            st.session_state.render_step = f"\u26a0 Gagal render preview: {err[:80]}"
+        st.session_state.render_progress = 1.0
+    except Exception as e:
+        st.session_state.render_step = f"\u2716 Error preview: {e}"
+    finally:
+        st.session_state.rendering = False
+
 
 def _page_preview():
     ov = st.session_state.get("out_video")
