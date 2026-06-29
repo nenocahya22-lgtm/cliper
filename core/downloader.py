@@ -207,6 +207,14 @@ class ProxyRotator:
     _proxies: list = []
     _current: int = 0
     _failed_indices: set = set()
+    # URL API publik untuk mengambil proxy gratis
+    _PROXY_API_URLS = [
+        "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&protocol=http&proxy_format=protocolipport&format=text&timeout=5000",
+        "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&protocol=socks5&proxy_format=protocolipport&format=text&timeout=5000",
+        "https://api.proxyscrape.com/v4/free-proxy-list/get?request=display_proxies&protocol=socks4&proxy_format=protocolipport&format=text&timeout=5000",
+        "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
+        "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks5.txt",
+    ]
 
     @classmethod
     def load(cls):
@@ -276,6 +284,89 @@ class ProxyRotator:
         print("[proxy] Semua proxy gagal! Reset daftar failed dan coba lagi.")
         cls._failed_indices = set()
         return cls._proxies[0] if cls._proxies else None
+
+    @classmethod
+    def fetch_free_proxies(cls, max_per_source: int = 80) -> list:
+        """
+        Ambil proxy gratis dari API publik, test langsung ke YouTube.
+        Hanya simpan proxy yang benar-benar bisa tembus YouTube.
+        """
+        import urllib.request
+        print("[proxy] Mengambil proxy gratis dari API publik...")
+        
+        all_raw = []
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        
+        for url in cls._PROXY_API_URLS:
+            try:
+                proto = "http"
+                if "socks5" in url: proto = "socks5"
+                if "socks4" in url: proto = "socks4"
+                req = urllib.request.Request(url, headers=headers)
+                resp = urllib.request.urlopen(req, timeout=15)
+                data = resp.read().decode(errors="replace").strip().split("\n")
+                count = 0
+                for line in data:
+                    line = line.strip()
+                    if line and not line.startswith("#") and ":" in line:
+                        if not line.startswith("http"):
+                            line = f"{proto}://{line}"
+                        all_raw.append(line)
+                        count += 1
+                        if count >= max_per_source:
+                            break
+                print(f"[proxy]  {len(data[:max_per_source])} dari {url.split('/')[-1][:20]}")
+            except Exception as e:
+                print(f"[proxy]  Gagal ambil dari {url[:50]}: {str(e)[:40]}")
+        
+        # Hapus duplikat
+        all_raw = list(dict.fromkeys(all_raw))
+        print(f"[proxy] Total unik: {len(all_raw)}")
+        
+        # Test langsung ke YouTube dengan yt-dlp (skip socket — gak cukup)
+        import socket as _sock
+        living = []
+        for i, p in enumerate(all_raw):
+            # Socket test dulu (cepat)
+            try:
+                parts = p.split("://")[1].split(":")
+                host = parts[0]
+                port = int(parts[1]) if len(parts) > 1 else 80
+                s = _sock.socket(_sock.AF_INET, _sock.SOCK_STREAM)
+                s.settimeout(3)
+                s.connect((host, port))
+                s.close()
+            except:
+                continue
+            
+            # Test dengan yt-dlp ke YouTube (ambil 10 proxy pertama yg tembus)
+            if len(living) < 10:
+                try:
+                    r = subprocess.run([
+                        "yt-dlp", "--proxy", p,
+                        "--skip-download", "--print", "title",
+                        "--socket-timeout", "5",
+                        "--no-warnings",
+                        "https://www.youtube.com/watch?v=60ssnYN1F_s"
+                    ], capture_output=True, text=True, timeout=8)
+                    if r.returncode == 0 and r.stdout.strip():
+                        living.append(p)
+                        print(f"[proxy]  YouTube OK #{len(living)}: {p[:50]}")
+                except:
+                    pass
+            
+            if (i+1) % 200 == 0:
+                print(f"[proxy]  Progress {i+1}/{len(all_raw)}... {len(living)} proxy tembus YouTube")
+        
+        print(f"[proxy] Total tembus YouTube: {len(living)}/{len(all_raw)}")
+        
+        if living:
+            cls._proxies = living
+            cls._current = 0
+            cls._failed_indices = set()
+            cls.save()
+        
+        return living
 
     @classmethod
     def status(cls) -> dict:

@@ -1848,13 +1848,13 @@ def main():
             proxy_text = st.text_area(
                 "Daftar Proxy (1 per baris)",
                 value="\n".join(current_proxies),
-                height=100,
+                height=80,
                 placeholder="http://user:pass@host:port\nsocks5://host:1080\nhttp://host:8080",
                 label_visibility="collapsed",
                 help="Format: protocol://user:pass@host:port\nContoh: socks5://user:pass@1.2.3.4:1080"
             )
 
-            col_save, col_test = st.columns(2)
+            col_save, col_refresh = st.columns(2)
             if col_save.button("\U0001f4be Simpan", use_container_width=True):
                 proxies = [p.strip() for p in proxy_text.split("\n") if p.strip()]
                 ProxyRotator.set_proxies(proxies)
@@ -1862,8 +1862,20 @@ def main():
                 time.sleep(0.5)
                 st.rerun()
 
+            # Tombol Refresh — ambil proxy gratis dari internet
+            if col_refresh.button("\U0001f504 Refresh", use_container_width=True, type="secondary"):
+                with st.spinner("Mengambil proxy gratis dari 5 sumber..."):
+                    results = ProxyRotator.fetch_free_proxies(max_per_source=80)
+                if results:
+                    st.success(f"Dapat {len(results)} proxy gratis!")
+                else:
+                    st.error("Tidak ada proxy gratis yang hidup. Coba lagi nanti.")
+                time.sleep(1)
+                st.rerun()
+
             status = ProxyRotator.status()
             if status["total"] > 0:
+                col_rotate, _ = st.columns(2)
                 st.markdown(
                     f'<div style="font-size:10px;color:var(--on-carbon);margin-top:4px">'
                     f'<strong>Status:</strong> {status["total"]} proxy '
@@ -1880,7 +1892,7 @@ def main():
                         f'</div>',
                         unsafe_allow_html=True
                     )
-                if col_test.button("\U0001f504 Rotate", use_container_width=True):
+                if col_rotate.button("\U0001f500 Ganti Manual", use_container_width=True):
                     old = ProxyRotator.get_current()
                     ProxyRotator.rotate()
                     new = ProxyRotator.get_current()
@@ -1890,10 +1902,20 @@ def main():
             else:
                 st.markdown(
                     '<div style="font-size:10px;color:var(--muted-indigo);margin-top:4px">'
-                    'Belum ada proxy. Masukkan proxy di atas lalu klik Simpan.'
+                    'Belum ada proxy. Klik <strong>Refresh</strong> untuk ambil proxy gratis dari internet, '
+                    'atau masukkan proxy manual di atas.'
                     '</div>',
                     unsafe_allow_html=True
                 )
+                if st.button("\U0001f504 Ambil Proxy Gratis", use_container_width=True, type="primary"):
+                    with st.spinner("Mengambil proxy gratis dari 5 sumber..."):
+                        results = ProxyRotator.fetch_free_proxies(max_per_source=80)
+                    if results:
+                        st.success(f"Dapat {len(results)} proxy gratis!")
+                    else:
+                        st.error("Tidak ada proxy gratis yang hidup. Coba lagi nanti.")
+                    time.sleep(1)
+                    st.rerun()
         user = st.session_state.get("user", {})
         st.markdown(f"""
         <div class="sidebar-user-badge">
