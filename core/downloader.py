@@ -1,6 +1,6 @@
 import os, re, time, uuid, subprocess, shutil
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Optional
 
 FFMPEG_PATH = "ffmpeg"
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -16,6 +16,8 @@ for _p in [os.path.join(BASE_DIR, "ffmpeg.exe"), "ffmpeg", "ffmpeg.exe"]:
 if FFMPEG_PATH == "ffmpeg":
     _s = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
     if _s: FFMPEG_PATH = _s
+
+PROXIES_FILE = os.path.join(BASE_DIR, "proxies.json")
 
 SUPPORTED_PLATFORMS = {"youtube.com":"YouTube","youtu.be":"YouTube","tiktok.com":"TikTok",
     "instagram.com":"Instagram","twitch.tv":"Twitch","facebook.com":"Facebook",
@@ -159,8 +161,132 @@ def _default_opts(url: str = "", **extra):
     # Skip format checking — kurangi 1 API call (sering trigger 413 di cloud)
     opts["check_formats"] = "none"  # string "none", bukan None!
 
+    # Proxy TIDAK di-set di sini! Caller harus explicit pass proxy= lewat **extra
+    # Ini penting karena _default_opts dipanggil berkali-kali per download attempt
+    # (extraction A, extraction B, download native, download ffmpeg, dll)
+    # Kalau proxy di-set di sini, tiap panggilan bakal pakai proxy berbeda.
+
     opts.update(extra)
     return opts
+
+def _load_proxies() -> list:
+    """Load proxy list from proxies.json."""
+    import json
+    if os.path.exists(PROXIES_FILE):
+        try:
+            with open(PROXIES_FILE) as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return data
+            elif isinstance(data, dict) and "proxies" in data:
+                return data["proxies"]
+        except:
+            pass
+    return []
+
+def _save_proxies(proxies: list):
+    """Save proxy list to proxies.json."""
+    import json
+    try:
+        with open(PROXIES_FILE, "w") as f:
+            json.dump({"proxies": proxies, "updated_at": time.strftime("%Y-%m-%d %H:%M:%S")}, f, indent=2)
+    except Exception as e:
+        print(f"[proxy] Gagal simpan proxy: {e}")
+
+
+class ProxyRotator:
+    """
+    Rotating proxy manager untuk yt-dlp.
+    Otomatis berganti proxy saat kena block (HTTP 403/413).
+    
+    Format proxy:
+      - http://user:pass@host:port
+      - socks5://user:pass@host:port
+      - http://host:port
+    """
+    _proxies: list = []
+    _current: int = 0
+    _failed_indices: set = set()
+
+    @classmethod
+    def load(cls):
+        """Load proxy list from config file."""
+        cls._proxies = _load_proxies()
+        cls._current = 0
+        cls._failed_indices = set()
+        return cls._proxies
+
+    @classmethod
+    def save(cls):
+        """Save current proxy list to config file."""
+        _save_proxies(cls._proxies)
+
+    @classmethod
+    def set_proxies(cls, proxies: list):
+        """Set proxy list and save."""
+        cls._proxies = [p.strip() for p in proxies if p.strip()]
+        cls._current = 0
+        cls._failed_indices = set()
+        cls.save()
+
+    @classmethod
+    def get_list(cls) -> list:
+        """Get all proxies."""
+        return cls._proxies
+
+    @classmethod
+    def get_current(cls) -> Optional[str]:
+        """Get current active proxy."""
+        if not cls._proxies:
+            return None
+        idx = cls._current % len(cls._proxies)
+        return cls._proxies[idx]
+
+    @classmethod
+    def get_current_index(cls) -> int:
+        return cls._current % max(len(cls._proxies), 1)
+
+    @classmethod
+    def rotate(cls) -> Optional[str]:
+        """Pindah ke proxy berikutnya (round-robin)."""
+        if not cls._proxies:
+            return None
+        cls._current = (cls._current + 1) % len(cls._proxies)
+        return cls.get_current()
+
+    @classmethod
+    def mark_failed(cls, proxy: str):
+        """Tandai proxy yang gagal (403/413) agar tidak dipakai lagi di sesi ini."""
+        if proxy in cls._proxies:
+            idx = cls._proxies.index(proxy)
+            cls._failed_indices.add(idx)
+            print(f"[proxy] Tandai {proxy} sebagai gagal. Tersisa {len(cls._proxies) - len(cls._failed_indices)} proxy.")
+
+    @classmethod
+    def get_healthy_proxy(cls) -> Optional[str]:
+        """Dapatkan proxy sehat berikutnya (lewati yang gagal)."""
+        if not cls._proxies:
+            return None
+        for _ in range(len(cls._proxies)):
+            idx = cls._current % len(cls._proxies)
+            cls._current += 1
+            if idx not in cls._failed_indices:
+                return cls._proxies[idx]
+        # Semua proxy gagal — reset failed
+        print("[proxy] Semua proxy gagal! Reset daftar failed dan coba lagi.")
+        cls._failed_indices = set()
+        return cls._proxies[0] if cls._proxies else None
+
+    @classmethod
+    def status(cls) -> dict:
+        """Status current proxy rotator."""
+        return {
+            "total": len(cls._proxies),
+            "current": cls.get_current(),
+            "current_index": cls.get_current_index(),
+            "failed": len(cls._failed_indices),
+        }
+
 
 class VideoDownloader:
     @staticmethod
@@ -243,6 +369,7 @@ class VideoDownloader:
 
     @staticmethod
     def download_audio(url: str, out: str, max_dur: float = 600) -> Tuple[str, str, float]:
+        import yt_dlp
         os.makedirs(out, exist_ok=True)
         _cleanup_part_files(out)
         platform = _detect_platform(url)
@@ -250,35 +377,84 @@ class VideoDownloader:
         title = info.get("title","Unknown")
         dur = info.get("duration",0) or 0
         limit = min(dur or max_dur, max_dur)
-        # Strategi #1: native yt-dlp (pakai headers/cookies bawaan, TLS fingerprint lebih baik)
-        opts = _default_opts(url,
-            format="bestaudio/best",
-            outtmpl=os.path.join(out, "audio_%(id)s.%(ext)s"),
-            postprocessors=[{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
-        )
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                ydl.download([url])
-        except Exception as e:
-            print(f"[download_audio] Native yt-dlp gagal, coba dengan ffmpeg downloader: {e}")
-            # Strategi #2: fallback ke ffmpeg downloader (lebih lambat tapi kadang work)
+
+        max_retries = max(len(ProxyRotator.get_list()), 1) * 2  # max retries = jumlah proxy * 2
+        for attempt in range(max_retries):
+            current_proxy = ProxyRotator.get_current()
+            if attempt > 0:
+                # Rotate ke proxy berikutnya
+                ProxyRotator.rotate()
+                new_proxy = ProxyRotator.get_current()
+                if new_proxy == current_proxy and len(ProxyRotator.get_list()) > 1:
+                    ProxyRotator.rotate()
+                print(f"[proxy] Retry #{attempt} — ganti proxy ke: {ProxyRotator.get_current()}")
+                time.sleep(2)
+
+            # Dapatkan proxy SEKALI per attempt — pass explicit via extra
+            proxy_url = ProxyRotator.get_current()
+            proxy_extra = {"proxy": proxy_url} if proxy_url else {}
+
+            # Strategi #1: native yt-dlp
+            opts = _default_opts(url,
+                format="bestaudio/best",
+                outtmpl=os.path.join(out, "audio_%(id)s.%(ext)s"),
+                postprocessors=[{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
+                **proxy_extra,
+            )
             try:
-                opts2 = _default_opts(url,
-                    format="bestaudio/best",
-                    outtmpl=os.path.join(out, "audio_%(id)s.%(ext)s"),
-                    postprocessors=[{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
-                    external_downloader="ffmpeg",
-                    external_downloader_args={"ffmpeg": ["-ss", "0", "-t", str(limit)]},
-                )
-                with yt_dlp.YoutubeDL(opts2) as ydl:
+                with yt_dlp.YoutubeDL(opts) as ydl:
                     ydl.download([url])
-            except Exception as e2:
-                print(f"[download_audio] Download gagal total: {e2}")
-                return ("", title, dur)
+                # Berhasil! lanjut ke proses file
+                break
+            except Exception as e:
+                err_str = str(e)
+                is_block = "403" in err_str or "413" in err_str or "429" in err_str or "block" in err_str.lower()
+                if is_block:
+                    proxy = ProxyRotator.get_current()
+                    if proxy:
+                        ProxyRotator.mark_failed(proxy)
+                    print(f"[download_audio] Attempt #{attempt+1} kena block: {err_str[:80]}")
+                    if attempt < max_retries - 1:
+                        continue  # coba proxy lain
+                else:
+                    # Bukan block error — coba strategi ffmpeg fallback
+                    print(f"[download_audio] Native yt-dlp gagal, coba ffmpeg: {err_str[:80]}")
+
+                # Strategi #2: ffmpeg downloader fallback — pakai proxy yg sama
+                try:
+                    if is_block:
+                        continue  # coba proxy lain dulu
+                    opts2 = _default_opts(url,
+                        format="bestaudio/best",
+                        outtmpl=os.path.join(out, "audio_%(id)s.%(ext)s"),
+                        postprocessors=[{"key": "FFmpegExtractAudio", "preferredcodec": "wav"}],
+                        external_downloader="ffmpeg",
+                        external_downloader_args={"ffmpeg": ["-ss", "0", "-t", str(limit)]},
+                        **proxy_extra,
+                    )
+                    with yt_dlp.YoutubeDL(opts2) as ydl:
+                        ydl.download([url])
+                    break  # berhasil
+                except Exception as e2:
+                    print(f"[download_audio] ffmpeg fallback gagal: {str(e2)[:80]}")
+                    if "403" in str(e2) or "413" in str(e2):
+                        # ffmpeg juga kena block — coba proxy lain
+                        proxy = ProxyRotator.get_current()
+                        if proxy:
+                            ProxyRotator.mark_failed(proxy)
+                        if attempt < max_retries - 1:
+                            continue
+                    return ("", title, dur)
+        else:
+            # Loop selesai tanpa break — semua retry gagal
+            print(f"[download_audio] Semua {max_retries} percobaan gagal")
+            _cleanup_cookie_files()
+            return ("", title, dur)
+
+        # Proses file hasil download
         files = sorted(Path(out).glob("audio_*.wav")) or sorted(Path(out).glob("audio_*.*"))
         if files:
             raw_wav = str(files[0])
-            # If not already wav, convert
             if not raw_wav.endswith(".wav"):
                 temp_wav = raw_wav.rsplit(".",1)[0] + ".wav"
                 r = subprocess.run([FFMPEG_PATH, "-y", "-i", raw_wav, "-ac", "1", "-ar", "16000", temp_wav], capture_output=True, text=True)
@@ -286,9 +462,9 @@ class VideoDownloader:
                     raw_wav = temp_wav
                 else:
                     print(f"[download_audio] Gagal konversi ke WAV: {r.stderr[:200]}")
+                    _cleanup_cookie_files()
                     return ("", title, dur)
             else:
-                # Normalize to 16000Hz mono WAV for Whisper
                 temp_wav = raw_wav + ".normalized.wav"
                 r = subprocess.run([FFMPEG_PATH, "-y", "-i", raw_wav, "-ac", "1", "-ar", "16000", temp_wav], capture_output=True, text=True)
                 if Path(temp_wav).exists():
@@ -326,54 +502,92 @@ class VideoDownloader:
         final = os.path.join(out, f"clip_{cid}.mp4")
         dur = ett - stt
 
-        # Strategi #1: native yt-dlp — download FULL video dulu (headers/cookies jalan)
-        full_raw = os.path.join(out, f"full_{cid}.%(ext)s")
-        full_opts = _default_opts(url,
-            format="bestvideo[height<=1080][fps<=60]+bestaudio/best[height<=1080][fps<=60]",
-            outtmpl=full_raw,
-            merge_output_format="mp4",
-        )
-        try:
-            with yt_dlp.YoutubeDL(full_opts) as ydl:
-                ydl.download([url])
-        except Exception as e:
-            print(f"[download_video_clip] Native yt-dlp gagal, coba ffmpeg downloader: {e}")
-            # Strategi #2: fallback — ffmpeg downloader langsung segment
-            ff_opts = _default_opts(url,
+        max_retries = max(len(ProxyRotator.get_list()), 1) * 2
+        for attempt in range(max_retries):
+            current_proxy = ProxyRotator.get_current()
+            if attempt > 0:
+                ProxyRotator.rotate()
+                new_proxy = ProxyRotator.get_current()
+                if new_proxy == current_proxy and len(ProxyRotator.get_list()) > 1:
+                    ProxyRotator.rotate()
+                print(f"[proxy] Retry video #{attempt} — ganti proxy ke: {ProxyRotator.get_current()}")
+                time.sleep(2)
+
+            # Dapatkan proxy SEKALI per attempt
+            proxy_url = ProxyRotator.get_current()
+            proxy_extra = {"proxy": proxy_url} if proxy_url else {}
+
+            # Strategi #1: native yt-dlp — download FULL video dulu
+            full_raw = os.path.join(out, f"full_{cid}.%(ext)s")
+            full_opts = _default_opts(url,
                 format="bestvideo[height<=1080][fps<=60]+bestaudio/best[height<=1080][fps<=60]",
-                outtmpl=os.path.join(out, f"raw_{cid}.%(ext)s"),
+                outtmpl=full_raw,
                 merge_output_format="mp4",
-                external_downloader="ffmpeg",
-                external_downloader_args={"ffmpeg": ["-ss", str(stt), "-t", str(dur)]},
+                **proxy_extra,
             )
             try:
-                with yt_dlp.YoutubeDL(ff_opts) as ydl:
+                with yt_dlp.YoutubeDL(full_opts) as ydl:
                     ydl.download([url])
-            except Exception as e2:
-                print(f"[download_video_clip] Download gagal total: {e2}")
-                _cleanup_cookie_files()
-                return ""
-            # Trim hasil ffmpeg download
-            rfs = sorted(Path(out).glob(f"raw_{cid}.*"))
-            if rfs:
-                rf = str(rfs[0])
-                if Path(rf).stat().st_size > 0:
-                    result = VideoDownloader._trim_to_clip(rf, final, 0, dur)
+                # Berhasil! trim hasil full video ke segmen
+                rfs = sorted(Path(out).glob(f"full_{cid}.*"))
+                if not rfs:
+                    print(f"[download_video_clip] Tidak ada file full_{cid}.*")
                     _cleanup_cookie_files()
-                    return result
-            _cleanup_cookie_files()
-            return ""
+                    return ""
+                rf = str(rfs[0])
+                result = VideoDownloader._trim_to_clip(rf, final, stt, dur)
+                _cleanup_cookie_files()
+                return result
+            except Exception as e:
+                err_str = str(e)
+                is_block = "403" in err_str or "413" in err_str or "429" in err_str or "block" in err_str.lower()
+                if is_block:
+                    proxy = ProxyRotator.get_current()
+                    if proxy:
+                        ProxyRotator.mark_failed(proxy)
+                    print(f"[download_video_clip] Attempt #{attempt+1} kena block: {err_str[:80]}")
+                    if attempt < max_retries - 1:
+                        continue  # coba proxy lain
+                else:
+                    print(f"[download_video_clip] Native gagal, coba ffmpeg: {err_str[:80]}")
 
-        # Strategi #1 berhasil — trim hasil full video ke segmen
-        rfs = sorted(Path(out).glob(f"full_{cid}.*"))
-        if not rfs:
-            print(f"[download_video_clip] Tidak ada file full_{cid}.*")
-            _cleanup_cookie_files()
-            return ""
-        rf = str(rfs[0])
-        result = VideoDownloader._trim_to_clip(rf, final, stt, dur)
+                # Strategi #2: ffmpeg fallback — pakai proxy yg sama
+                try:
+                    if is_block and attempt < max_retries - 1:
+                        continue  # kalo block, coba proxy lain dulu
+                    ff_opts = _default_opts(url,
+                        format="bestvideo[height<=1080][fps<=60]+bestaudio/best[height<=1080][fps<=60]",
+                        outtmpl=os.path.join(out, f"raw_{cid}.%(ext)s"),
+                        merge_output_format="mp4",
+                        external_downloader="ffmpeg",
+                        external_downloader_args={"ffmpeg": ["-ss", str(stt), "-t", str(dur)]},
+                        **proxy_extra,
+                    )
+                    with yt_dlp.YoutubeDL(ff_opts) as ydl:
+                        ydl.download([url])
+                    # Trim hasil ffmpeg download
+                    rfs = sorted(Path(out).glob(f"raw_{cid}.*"))
+                    if rfs:
+                        rf = str(rfs[0])
+                        if Path(rf).stat().st_size > 0:
+                            result = VideoDownloader._trim_to_clip(rf, final, 0, dur)
+                            _cleanup_cookie_files()
+                            return result
+                except Exception as e2:
+                    print(f"[download_video_clip] ffmpeg gagal: {str(e2)[:80]}")
+                    if "403" in str(e2) or "413" in str(e2):
+                        proxy = ProxyRotator.get_current()
+                        if proxy:
+                            ProxyRotator.mark_failed(proxy)
+                        if attempt < max_retries - 1:
+                            continue
+                    _cleanup_cookie_files()
+                    return ""
+
+        # Semua retry gagal
+        print(f"[download_video_clip] Semua {max_retries} percobaan gagal")
         _cleanup_cookie_files()
-        return result
+        return ""
 
     @staticmethod
     def extract_audio_from_local(video_path: str, out: str) -> Tuple[str, float]:

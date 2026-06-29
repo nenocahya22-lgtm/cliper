@@ -7,7 +7,7 @@ import os, time, uuid, subprocess, shutil, threading, json
 from pathlib import Path
 import streamlit as st
 
-from core.downloader import VideoDownloader, _default_opts
+from core.downloader import VideoDownloader, _default_opts, ProxyRotator, _load_proxies
 from core.transcriber import AudioTranscriber, WordTimestamp
 from core.finder import ViralMomentFinder, ProcessingResult
 from core.editor import SubtitleGenerator, VideoProcessor, SUBTITLE_COLORS, ASPECT_PRESETS, TRANSITIONS
@@ -1837,6 +1837,63 @@ def main():
                 unsafe_allow_html=True,
             )
         st.markdown('</div>', unsafe_allow_html=True)
+
+        # ── Proxy Configuration ───────────────────────────────────
+        st.markdown('<div class="sidebar-model" style="margin-top:var(--sp-lg)"><label>Proxy Settings</label></div>', unsafe_allow_html=True)
+        with st.expander("\U0001f310 Proxy Rotating", expanded=False):
+            current_proxies = ProxyRotator.get_list() or _load_proxies()
+            if current_proxies:
+                ProxyRotator.set_proxies(current_proxies)
+
+            proxy_text = st.text_area(
+                "Daftar Proxy (1 per baris)",
+                value="\n".join(current_proxies),
+                height=100,
+                placeholder="http://user:pass@host:port\nsocks5://host:1080\nhttp://host:8080",
+                label_visibility="collapsed",
+                help="Format: protocol://user:pass@host:port\nContoh: socks5://user:pass@1.2.3.4:1080"
+            )
+
+            col_save, col_test = st.columns(2)
+            if col_save.button("\U0001f4be Simpan", use_container_width=True):
+                proxies = [p.strip() for p in proxy_text.split("\n") if p.strip()]
+                ProxyRotator.set_proxies(proxies)
+                st.success(f"{len(proxies)} proxy disimpan!")
+                time.sleep(0.5)
+                st.rerun()
+
+            status = ProxyRotator.status()
+            if status["total"] > 0:
+                st.markdown(
+                    f'<div style="font-size:10px;color:var(--on-carbon);margin-top:4px">'
+                    f'<strong>Status:</strong> {status["total"]} proxy '
+                    f'| <strong>Aktif:</strong> #{status["current_index"]+1} '
+                    f'| <strong>Gagal:</strong> {status["failed"]}'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
+                if status["current"]:
+                    cur = status["current"]
+                    st.markdown(
+                        f'<div style="font-size:9px;color:var(--muted-indigo);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'
+                        f'{cur[:50]}...'
+                        f'</div>',
+                        unsafe_allow_html=True
+                    )
+                if col_test.button("\U0001f504 Rotate", use_container_width=True):
+                    old = ProxyRotator.get_current()
+                    ProxyRotator.rotate()
+                    new = ProxyRotator.get_current()
+                    st.info(f"Ganti: {old[:30] if old else 'none'} \u2192 {new[:30] if new else 'none'}")
+                    time.sleep(0.5)
+                    st.rerun()
+            else:
+                st.markdown(
+                    '<div style="font-size:10px;color:var(--muted-indigo);margin-top:4px">'
+                    'Belum ada proxy. Masukkan proxy di atas lalu klik Simpan.'
+                    '</div>',
+                    unsafe_allow_html=True
+                )
         user = st.session_state.get("user", {})
         st.markdown(f"""
         <div class="sidebar-user-badge">
