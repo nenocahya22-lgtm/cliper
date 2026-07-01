@@ -1027,6 +1027,34 @@ def page_dashboard():
     if q2.button("\U0001f4c1\nUpload Local", use_container_width=True):
         st.session_state.page = "new_clip"
         st.rerun()
+
+    # ── Dashboard Drag & Drop Zone ─────────────────────────────
+    st.markdown(
+        '<p style="font-size:11px;font-weight:700;color:var(--ink-soft);'
+        'margin:var(--sp-lg) 0 var(--sp-sm);text-transform:uppercase;'
+        'letter-spacing:0.5px">📥 Quick Upload — Drop video langsung</p>',
+        unsafe_allow_html=True
+    )
+    dash_up = st.file_uploader(
+        "Drop video here to instantly find viral moments",
+        type=list(SUPPORTED_VIDEO_EXT),
+        key="dash_upload",
+        label_visibility="collapsed"
+    )
+    if dash_up:
+        wd = st.session_state.wd
+        ext = dash_up.name.rsplit(".",1)[-1].lower()
+        p = os.path.join(wd, f"up_{uuid.uuid4().hex[:8]}.{ext}")
+        with open(p,"wb") as f:
+            f.write(dash_up.getbuffer())
+        st.session_state.src = "local"
+        st.session_state.local_path = p
+        st.session_state.local_name = dash_up.name
+        st.session_state.moment_mode = "Rule-based (Cepat)"
+        st.session_state.processing = True
+        st.session_state.step = 2
+        st.rerun()
+
     if q3.button("\U0001f33e\nFarm Mode", use_container_width=True):
         st.session_state.page = "new_clip"
         st.rerun()
@@ -1063,18 +1091,73 @@ def _page_multi_step():
 
 def _page_input():
     st.markdown('<h1 class="page-header">New Clip</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="page-sub">Paste a link or upload a file to create viral clips</p>', unsafe_allow_html=True)
-    tab1, tab2, tab3 = st.tabs(["\U0001f517 Link", "\U0001f4c1 Upload", "\U0001f33e Farm"])
-    with tab1:
-        url = st.text_input("Video URL", placeholder="https://youtube.com/...", key="vurl_input", label_visibility="collapsed")
+    st.markdown('<p class="page-sub">Drop video langsung dari desktop &mdash; atau tempel link YouTube/TikTok</p>', unsafe_allow_html=True)
+
+    # Hero: Drag & Drop Zone Raksasa
+    st.markdown(
+        '<div style="background:var(--periwinkle);padding:var(--sp-xl);'
+        'clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);'
+        'box-shadow:inset 0 1px 0 rgba(255,255,255,0.3),inset 0 -1px 0 var(--chrome-indigo);'
+        'text-align:center;margin-bottom:var(--sp-lg)">'
+        '<div style="font-size:48px;margin-bottom:var(--sp-sm)">\U0001f4c1</div>'
+        '<p style="font-size:16px;font-weight:900;color:var(--carbon);margin:0 0 4px">Drop Video di Sini</p>'
+        '<p style="font-size:11px;color:var(--ink-soft);margin:0">'
+        'MP4, MOV, AVI, MKV, WEBM &mdash; langsung detect momen viral tanpa download'
+        '</p></div>',
+        unsafe_allow_html=True
+    )
+    up = st.file_uploader(
+        "Upload Video",
+        type=list(SUPPORTED_VIDEO_EXT),
+        key="newclip_upload",
+        label_visibility="collapsed"
+    )
+    if up:
+        sz = len(up.getvalue()) / (1024*1024)
+        st.markdown(f'<p style="color:var(--ink-soft);font-size:11px;margin:4px 0">{up.name} ({sz:.1f} MB)</p>', unsafe_allow_html=True)
+        mode_l = st.radio(
+            "Metode Analisis Momen",
+            ["Rule-based (Cepat)", "Llama AI (Pintar)"],
+            key="nc_moment_mode",
+            horizontal=True
+        )
+        st.session_state.moment_mode = mode_l
+        if st.button("🎬 Process Video & Find Viral Moments", type="primary", use_container_width=True):
+            wd = st.session_state.wd
+            ext = up.name.rsplit(".",1)[-1].lower()
+            p = os.path.join(wd, f"up_{uuid.uuid4().hex[:8]}.{ext}")
+            with open(p,"wb") as f:
+                f.write(up.getbuffer())
+            st.session_state.src = "local"
+            st.session_state.local_path = p
+            st.session_state.local_name = up.name
+            st.session_state.processing = True
+            st.session_state.step = 2
+            st.rerun()
+
+    st.markdown('<hr>', unsafe_allow_html=True)
+
+    # URL Input &mdash; secondary
+    with st.expander("🔗 Atau pakai link YouTube / TikTok / Facebook", expanded=False):
+        url = st.text_input(
+            "Video URL",
+            placeholder="https://youtube.com/...",
+            key="vurl_input",
+            label_visibility="collapsed"
+        )
         if url:
             st.session_state.vurl = url
             p = VideoDownloader.detect_platform(url)
             if p:
                 st.markdown(f'<p style="color:var(--nav-gold);font-size:11px;margin:4px 0;font-weight:700">\u2713 Platform: {p}</p>', unsafe_allow_html=True)
-                mode = st.radio("Metode Analisis Momen", ["Rule-based (Cepat)", "Llama AI (Pintar)"], key="link_moment_mode", horizontal=True)
-                st.session_state.moment_mode = mode
-                if st.button("Download & Analyze", type="primary", use_container_width=True):
+                mode_url = st.radio(
+                    "Metode Analisis Momen",
+                    ["Rule-based (Cepat)", "Llama AI (Pintar)"],
+                    key="url_moment_mode",
+                    horizontal=True
+                )
+                st.session_state.moment_mode = mode_url
+                if st.button("📥 Download & Analyze", type="primary", use_container_width=True):
                     st.session_state.src = "url"
                     st.session_state.page = "dashboard"
                     st.session_state.processing = True
@@ -1082,41 +1165,52 @@ def _page_input():
                     st.rerun()
             else:
                 st.markdown(f'<p style="color:var(--nintendo-red);font-size:11px;margin:4px 0;font-weight:700">Platform not supported</p>', unsafe_allow_html=True)
-    with tab2:
-        up = st.file_uploader("Upload Video", type=list(SUPPORTED_VIDEO_EXT), label_visibility="collapsed")
-        if up:
-            sz = len(up.getvalue()) / (1024*1024)
-            st.markdown(f'<p style="color:var(--ink-soft);font-size:11px;margin:4px 0">{up.name} ({sz:.1f} MB)</p>', unsafe_allow_html=True)
-            mode_l = st.radio("Metode Analisis Momen", ["Rule-based (Cepat)", "Llama AI (Pintar)"], key="local_moment_mode", horizontal=True)
-            st.session_state.moment_mode = mode_l
-            if st.button("Process Local Video", type="primary", use_container_width=True):
-                wd = st.session_state.wd
-                ext = up.name.rsplit(".",1)[-1].lower()
-                p = os.path.join(wd, f"up_{uuid.uuid4().hex[:8]}.{ext}")
-                with open(p,"wb") as f:
-                    f.write(up.getbuffer())
-                st.session_state.src = "local"
-                st.session_state.local_path = p
-                st.session_state.local_name = up.name
-                st.session_state.page = "dashboard"
-                st.session_state.processing = True
-                st.session_state.step = 2
-                st.rerun()
-    with tab3:
-        st.markdown('<p style="font-size:12px;color:var(--ink-soft);margin-bottom:var(--sp-lg)">One link \u2192 multiple clips \u2192 scheduled upload</p>', unsafe_allow_html=True)
-        furl = st.text_input("Farm URL", placeholder="https://youtube.com/...", key="farm_url_input", label_visibility="collapsed")
+
+    # Farm Mode &mdash; secondary
+    with st.expander("🌾 Farm Mode &mdash; Satu link \u2192 banyak clip \u2192 auto upload", expanded=False):
+        furl = st.text_input(
+            "Farm URL",
+            placeholder="https://youtube.com/...",
+            key="farm_url_input",
+            label_visibility="collapsed"
+        )
         if furl:
             st.session_state.farm_url = furl
         cols = st.columns(3)
-        fplat = cols[0].multiselect("Platforms", ["youtube","tiktok","facebook"], default=["youtube"], label_visibility="collapsed")
-        fcount = cols[1].number_input("Clips", 1, 10, 5, label_visibility="collapsed")
-        ftime = cols[2].text_input("Start time", "08:00", label_visibility="collapsed")
-        mode_f = st.radio("Metode Analisis Momen (Farm)", ["Rule-based (Cepat)", "Llama AI (Pintar)"], key="farm_moment_mode", horizontal=True)
-        st.session_state.moment_mode = mode_f
-        if st.button("Process & Schedule All", type="primary", use_container_width=True, disabled=not furl):
+        fplat = cols[0].multiselect(
+            "Platforms",
+            ["youtube","tiktok","facebook"],
+            default=["youtube"],
+            label_visibility="collapsed"
+        )
+        fcount = cols[1].number_input(
+            "Clips", 1, 10, 5,
+            label_visibility="collapsed"
+        )
+        ftime = cols[2].text_input(
+            "Start time", "08:00",
+            label_visibility="collapsed"
+        )
+        mode_farm = st.radio(
+            "Metode Analisis Momen (Farm)",
+            ["Rule-based (Cepat)", "Llama AI (Pintar)"],
+            key="farm_moment_mode",
+            horizontal=True
+        )
+        st.session_state.moment_mode = mode_farm
+        if st.button(
+            "Process & Schedule All",
+            type="primary",
+            use_container_width=True,
+            disabled=not furl
+        ):
             if furl:
                 with st.spinner("Generating clips..."):
-                    threading.Thread(target=_farm_multi, args=(furl, fplat, fcount, ftime), daemon=True).start()
+                    threading.Thread(
+                        target=_farm_multi,
+                        args=(furl, fplat, fcount, ftime),
+                        daemon=True
+                    ).start()
                 st.success("Farm job started! Check progress in Queue.")
 
 def _farm_multi(url, platforms, count, start_time):
