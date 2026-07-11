@@ -1,2 +1,5 @@
 ffmpeg
 chromium-browser
+libcurl4-openssl-dev
+build-essential
+python3-dev
