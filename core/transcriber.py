@@ -57,12 +57,11 @@ class AudioTranscriber:
     @classmethod
     def _get_model(cls):
         if cls._model is None:
-            from faster_whisper import WhisperModel
+            import whisper
             gpu = cls.check_gpu()
-            device = gpu["device"]
-            compute = gpu["compute_type"]
-            print(f"[Whisper] GPU: {gpu['cuda']} | Device: {device} | Compute: {compute}")
-            cls._model = WhisperModel(WHISPER_MODEL_SIZE, device=device, compute_type=compute)
+            device = "cuda" if gpu["cuda"] else "cpu"
+            print(f"[Whisper] GPU: {gpu['cuda']} | Device: {device}")
+            cls._model = whisper.load_model(WHISPER_MODEL_SIZE, device=device)
         return cls._model
 
     @staticmethod
@@ -76,14 +75,13 @@ class AudioTranscriber:
 
         all_words = []
         try:
-            segs, info = model.transcribe(audio_path, beam_size=1, word_timestamps=True,
-                vad_filter=True)
-            for s in segs:
-                t = s.text.strip()
-                if t and s.words:
-                    for w in s.words:
-                        ww = w.word.strip()
-                        if ww: all_words.append(WordTimestamp(ww, round(w.start,2), round(w.end,2)))
+            result = model.transcribe(audio_path, word_timestamps=True, beam_size=1)
+            for seg in result.get("segments", []):
+                if seg.get("words"):
+                    for w in seg["words"]:
+                        ww = w.get("word", "").strip()
+                        if ww:
+                            all_words.append(WordTimestamp(ww, round(w.get("start", 0), 2), round(w.get("end", 0), 2)))
             if progress_callback: progress_callback("done", "")
         except Exception as e:
             if progress_callback: progress_callback("error", str(e))
