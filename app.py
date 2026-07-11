@@ -333,6 +333,13 @@ def _gen_preview(video_path, start, end, output_path):
         return Path(output_path).exists()
     except: return False
 
+def _do_gen_preview(video_path, start, end, output_path):
+    """Generate preview in background thread."""
+    try:
+        _gen_preview(video_path, start, end, output_path)
+    finally:
+        st.session_state._preview_building = False
+
 # ── Step 3: Pick Moment + Editor ────────────────────────
 def _step_moments():
     res = st.session_state.get("result")
@@ -394,6 +401,8 @@ def _step_moments():
         if selected and m.transcript_snippet:
             with c1:
                 st.markdown(f'<p style="font-size:11px;color:var(--ink-soft);margin:0;padding:4px 0">📝 {m.transcript_snippet[:200]}</p>', unsafe_allow_html=True)
+        if selected:
+            st.session_state._preview_building = False
 
     # ── Selected moment: preview clip + editor ───────────
     mom = st.session_state.get("sel_moment")
@@ -404,17 +413,38 @@ def _step_moments():
 
     st.markdown('<hr>', unsafe_allow_html=True)
 
-    # --- Trimmed preview ---
+    # --- Trimmed preview (async with spinner) ---
     preview_path = None
     if has_video:
         preview_path = os.path.join(st.session_state.wd, f"preview_{int(mom.start_time)}_{int(mom.end_time)}.mp4")
-        if not Path(preview_path).exists():
-            _gen_preview(res.video_path, mom.start_time, mom.end_time, preview_path)
+        preview_ready = Path(preview_path).exists()
+
+        # Start background generation if needed
+        if not preview_ready and not st.session_state.get("_preview_building", False):
+            st.session_state._preview_building = True
+            import threading
+            threading.Thread(target=_do_gen_preview,
+                args=(res.video_path, mom.start_time, mom.end_time, preview_path),
+                daemon=True).start()
+            st.rerun()
+            return
+
+        # Show spinner while generating
+        if st.session_state.get("_preview_building", False) and not preview_ready:
+            st.markdown('<div style="text-align:center;padding:40px 0">', unsafe_allow_html=True)
+            st.markdown('<div style="font-size:40px;margin-bottom:12px">⏳</div>', unsafe_allow_html=True)
+            st.markdown('<p style="font-size:15px;font-weight:600;color:var(--ink);margin:0 0 4px">Membuat preview...</p>', unsafe_allow_html=True)
+            st.markdown('<p style="font-size:12px;color:var(--ink-soft);margin:0">Memotong klip dengan ffmpeg — bentar ya</p>', unsafe_allow_html=True)
+            st.progress(0.5, text=" ")
+            st.markdown('</div>', unsafe_allow_html=True)
+            time.sleep(0.5); st.rerun()
+            return
+
+        # Preview generated — show it
         col_v1, col_v2 = st.columns([2, 1])
         with col_v1:
-            if Path(preview_path).exists():
-                st.markdown('<p style="font-size:12px;font-weight:600;color:var(--ink-soft);margin:0 0 4px">🎬 Preview Klip</p>', unsafe_allow_html=True)
-                st.video(preview_path)
+            st.markdown('<p style="font-size:12px;font-weight:600;color:var(--ink-soft);margin:0 0 4px">🎬 Preview Klip</p>', unsafe_allow_html=True)
+            st.video(preview_path)
         with col_v2:
             st.markdown(f"""
             <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px;">
@@ -453,9 +483,15 @@ def _step_moments():
     with col_r1:
         render_btn = st.button("🎬 Render Klip", type="primary", use_container_width=True, disabled=st.session_state.get("rendering", False))
     with col_r2:
-        if preview_path and Path(preview_path).exists():
+        if st.session_state.get("_preview_building", False):
+            st.markdown('<p style="text-align:center;font-size:12px;color:var(--ink-soft)">⏳ Preview sedang dibuat...</p>', unsafe_allow_html=True)
+        elif preview_path and Path(preview_path).exists():
             if st.button("🔄 Refresh Preview", use_container_width=True):
-                if Path(preview_path).exists(): os.remove(preview_path)
+                st.session_state._preview_building = True
+                import threading
+                threading.Thread(target=_do_gen_preview,
+                    args=(res.video_path, mom.start_time, mom.end_time, preview_path),
+                    daemon=True).start()
                 st.rerun()
     with col_r3:
         if st.button("⬅️ Back", use_container_width=True): _reset_all(); st.rerun()
