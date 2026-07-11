@@ -39,6 +39,27 @@ def _cleanup_cookie_files():
         except: pass
     _COOKIE_FILES_CLEANUP = []
 
+def _save_cookies_txt(content: str):
+    """Save a cookies.txt file (Netscape format) from user upload."""
+    path = os.path.join(ACCOUNTS_DIR, "youtube", "cookies.txt")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+
+def _load_cookies_txt(platform: str) -> Optional[str]:
+    """Check if a cookies.txt (Netscape format) exists for this platform.
+    Returns the file path if found, None otherwise."""
+    pname = platform.lower()
+    for cfile in [
+        os.path.join(ACCOUNTS_DIR, pname, "cookies.txt"),
+        os.path.join(ACCOUNTS_DIR, "cookies.txt"),
+    ]:
+        if os.path.exists(cfile) and os.path.getsize(cfile) > 50:
+            return cfile
+    return None
+
+
 def _load_cookies(platform: str) -> list:
     """Load saved cookies from accounts/ directory."""
     pname = platform.lower()
@@ -164,33 +185,37 @@ def _default_opts(url: str = "", **extra):
     except Exception:
         pass
 
-    # Attach cookies if available for this platform
-    cookies = _load_cookies(platform)
-    if cookies:
-        import tempfile, json
-        try:
-            # yt-dlp accepts cookies in Netscape format or as a file path
-            # For simplicity, convert cookies to Netscape format
-            cookie_lines = ["# Netscape HTTP Cookie File"]
-            for c in cookies:
-                domain = c.get("domain", "")
-                if not domain:
-                    continue
-                flag = "TRUE" if domain.startswith(".") else "FALSE"
-                path = c.get("path", "/")
-                secure = "TRUE" if c.get("secure", False) else "FALSE"
-                name = c.get("name", "")
-                value = c.get("value", "")
-                expiry = str(int(c.get("expiration_date", 0) or 0))
-                cookie_lines.append(f"{domain}\t{flag}\t{path}\t{secure}\t{expiry}\t{name}\t{value}")
-            cookie_text = "\n".join(cookie_lines)
-            cookie_file = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8")
-            cookie_file.write(cookie_text)
-            cookie_file.close()
-            opts["cookiefile"] = cookie_file.name
-            _COOKIE_FILES_CLEANUP.append(cookie_file.name)
-        except Exception as e:
-            print(f"[cookies] Gagal load cookies untuk {platform}: {e}")
+    # Priority: cookies.txt (Netscape format from user upload) > cookies.json (Playwright)
+    cookietxt = _load_cookies_txt(platform)
+    if cookietxt:
+        opts["cookiefile"] = cookietxt
+        print(f"[cookies] Pakai cookies.txt untuk {platform}: {cookietxt}")
+    else:
+        # Fallback: convert cookies.json (Playwright format) to Netscape format
+        cookies = _load_cookies(platform)
+        if cookies:
+            import tempfile, json
+            try:
+                cookie_lines = ["# Netscape HTTP Cookie File"]
+                for c in cookies:
+                    domain = c.get("domain", "")
+                    if not domain:
+                        continue
+                    flag = "TRUE" if domain.startswith(".") else "FALSE"
+                    path = c.get("path", "/")
+                    secure = "TRUE" if c.get("secure", False) else "FALSE"
+                    name = c.get("name", "")
+                    value = c.get("value", "")
+                    expiry = str(int(c.get("expiration_date", 0) or 0))
+                    cookie_lines.append(f"{domain}\t{flag}\t{path}\t{secure}\t{expiry}\t{name}\t{value}")
+                cookie_text = "\n".join(cookie_lines)
+                cookie_file = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8")
+                cookie_file.write(cookie_text)
+                cookie_file.close()
+                opts["cookiefile"] = cookie_file.name
+                _COOKIE_FILES_CLEANUP.append(cookie_file.name)
+            except Exception as e:
+                print(f"[cookies] Gagal load cookies.json untuk {platform}: {e}")
 
     # curl_cffi sudah otomatis dipakai yt-dlp kalau terinstall (TLS fingerprint browser asli)
     # Skip format checking — kurangi 1 API call (sering trigger 413 di cloud)

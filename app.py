@@ -158,6 +158,22 @@ def _step_input():
               </div>
             </div>
             """, unsafe_allow_html=True)
+        # ── Cookies.txt upload (bypass YouTube 403) ────
+        with st.expander("🍪 Cookies YouTube (bypass 403)"):
+            st.markdown('<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">Upload <code>cookies.txt</code> dari browser (pakai ekstensi "Get cookies.txt") supaya yt-dlp bisa bypass block YouTube.</p>', unsafe_allow_html=True)
+            uploaded = st.file_uploader("Pilih cookies.txt", type=["txt"], label_visibility="collapsed")
+            if uploaded:
+                try:
+                    from core.downloader import _save_cookies_txt
+                    content = uploaded.read().decode("utf-8", errors="replace")
+                    if "youtube.com" in content or ".youtube.com" in content:
+                        _save_cookies_txt(content)
+                        st.success("✅ cookies.txt tersimpan! YouTube 403 seharusnya teratasi.")
+                    else:
+                        st.warning("File tidak mengandung domain youtube.com. Pastikan file cookies.txt dari YouTube.")
+                except Exception as ex:
+                    st.error(f"Gagal simpan cookies: {ex}")
+        
         if st.button("🚀 Proses Video", type="primary", use_container_width=True):
             st.session_state.step = "processing"
             st.rerun()
