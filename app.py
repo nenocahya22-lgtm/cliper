@@ -31,12 +31,49 @@ def _get_ffmpeg():
     from core.downloader import FFMPEG_PATH
     return FFMPEG_PATH
 
+# ── Theme ───────────────────────────────────────────────
+THEME_DARK = {
+    "--canvas": "#08090d",
+    "--surface": "#10111a",
+    "--ink": "#f8fafc",
+    "--ink-soft": "#94a3b8",
+    "--card-bg": "rgba(255,255,255,0.02)",
+    "--card-border": "rgba(255,255,255,0.06)",
+    "--input-bg": "rgba(0,0,0,0.3)",
+    "--input-border": "rgba(255,255,255,0.1)",
+    "--input-color": "#fff",
+    "--select-bg": "#111219",
+    "--badge-bg": "rgba(255,255,255,0.04)",
+    "--hr-color": "rgba(255,255,255,0.04)",
+}
+
+THEME_LIGHT = {
+    "--canvas": "#f1f5f9",
+    "--surface": "#ffffff",
+    "--ink": "#0f172a",
+    "--ink-soft": "#64748b",
+    "--card-bg": "rgba(255,255,255,0.8)",
+    "--card-border": "rgba(0,0,0,0.08)",
+    "--input-bg": "#ffffff",
+    "--input-border": "rgba(0,0,0,0.15)",
+    "--input-color": "#0f172a",
+    "--select-bg": "#ffffff",
+    "--badge-bg": "rgba(0,0,0,0.04)",
+    "--hr-color": "rgba(0,0,0,0.08)",
+}
+
+def _theme_css() -> str:
+    theme = THEME_LIGHT if st.session_state.get("theme", "dark") == "light" else THEME_DARK
+    parts = "; ".join(f"{k}: {v}" for k, v in theme.items())
+    return f":root {{ {parts} }}"
+
 # ── Session state ───────────────────────────────────────
 def _init():
     defaults = {
         "step": "input", "result": None, "sel_moment": None,
         "out_video": None, "vurl": "", "processing": False,
         "rendering": False, "render_progress": 0.0, "render_done": False, "wd": None,
+        "theme": "dark",
     }
     for k, v in defaults.items():
         if k not in st.session_state: st.session_state[k] = v
@@ -57,7 +94,7 @@ def _reset_all():
 # ── CSS ─────────────────────────────────────────────────
 CSS = """<style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
-:root { --canvas: #08090d; --surface: #10111a; --ink: #f8fafc; --ink-soft: #94a3b8; --violet: #8b5cf6; --pink: #db2777; }
+:root { --violet: #8b5cf6; --pink: #db2777; }
 * { box-sizing: border-box; }
 html, body, [data-testid="stApp"], .stApp { background: var(--canvas) !important; font-family: 'Plus Jakarta Sans', sans-serif !important; color: var(--ink) !important; }
 [data-testid="stToolbar"] { display: none; } [data-testid="stDecoration"] { display: none; }
@@ -65,37 +102,37 @@ html, body, [data-testid="stApp"], .stApp { background: var(--canvas) !important
 .appview-container .main .block-container { padding: 0 !important; max-width: none !important; }
 .main-wrap { max-width: 720px; margin: 0 auto; padding: 40px 24px; text-align: center; }
 .hero-icon { font-size: 56px; margin-bottom: 8px; filter: drop-shadow(0 0 20px rgba(139,92,246,0.3)); }
-.hero-title { font-family: 'Space Grotesk', sans-serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; margin: 0 0 4px; background: linear-gradient(135deg, #fff 30%, #a78bfa 70%, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1.1; }
+.hero-title { font-family: 'Space Grotesk', sans-serif; font-size: 42px; font-weight: 800; letter-spacing: -1px; margin: 0 0 4px; background: linear-gradient(135deg, var(--ink) 30%, #a78bfa 70%, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; line-height: 1.1; }
 .hero-sub { font-size: 16px; color: var(--ink-soft); margin: 0 0 36px; line-height: 1.5; }
-.url-box { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; padding: 24px; margin-bottom: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+.url-box { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 20px; padding: 24px; margin-bottom: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.08); }
 .url-box:hover { border-color: rgba(139,92,246,0.3); }
-.stTextInput > div > div > input { border-radius: 14px !important; border: 1px solid rgba(255,255,255,0.1) !important; font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 18px !important; color: #fff !important; background: rgba(0,0,0,0.3) !important; padding: 16px 20px !important; text-align: center !important; height: 60px !important; transition: all 0.3s ease !important; }
+.stTextInput > div > div > input { border-radius: 14px !important; border: 1px solid var(--input-border) !important; font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 18px !important; color: var(--input-color) !important; background: var(--input-bg) !important; padding: 16px 20px !important; text-align: center !important; height: 60px !important; transition: all 0.3s ease !important; }
 .stTextInput > div > div > input:focus { border-color: var(--violet) !important; box-shadow: 0 0 0 3px rgba(139,92,246,0.15) !important; }
 .stButton > button { font-family: 'Plus Jakarta Sans', sans-serif !important; font-weight: 700 !important; font-size: 16px !important; padding: 14px 28px !important; border-radius: 14px !important; border: none !important; height: 56px !important; transition: all 0.3s cubic-bezier(0.4,0,0.2,1) !important; }
 .stButton > button[kind="primary"] { background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important; color: #fff !important; box-shadow: 0 4px 20px rgba(124,58,237,0.35) !important; }
 .stButton > button[kind="primary"]:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(124,58,237,0.5) !important; }
-.stButton > button[kind="secondary"] { background: rgba(255,255,255,0.04) !important; color: var(--ink) !important; border: 1px solid rgba(255,255,255,0.1) !important; }
-.moment-card, .result-card { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 16px; margin-bottom: 12px; text-align: left; transition: all 0.2s ease; }
-.moment-card:hover { border-color: rgba(139,92,246,0.3); background: rgba(255,255,255,0.04); transform: translateY(-2px); }
+.stButton > button[kind="secondary"] { background: var(--card-bg) !important; color: var(--ink) !important; border: 1px solid var(--card-border) !important; }
+.moment-card, .result-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; padding: 16px; margin-bottom: 12px; text-align: left; transition: all 0.2s ease; }
+.moment-card:hover { border-color: rgba(139,92,246,0.3); background: var(--badge-bg); transform: translateY(-2px); }
 .moment-card.selected { border-color: var(--violet); background: rgba(139,92,246,0.08); box-shadow: 0 0 20px rgba(139,92,246,0.15); }
-.moment-cat { font-size: 13px; font-weight: 700; color: #fff; }
+.moment-cat { font-size: 13px; font-weight: 700; color: var(--ink); }
 .moment-time { font-size: 11px; color: var(--ink-soft); margin-top: 2px; }
 .moment-reason { font-size: 11px; color: var(--ink-soft); margin-top: 4px; font-style: italic; }
 .stProgress > div > div > div > div { background: linear-gradient(90deg, #8b5cf6, #ec4899) !important; border-radius: 8px !important; }
-.stProgress > div > div > div { background: rgba(255,255,255,0.06) !important; border-radius: 8px !important; height: 6px !important; }
+.stProgress > div > div > div { background: var(--card-border) !important; border-radius: 8px !important; height: 6px !important; }
 .badge { display: inline-block; padding: 3px 10px; border-radius: 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
 .badge-green { background: rgba(16,185,129,0.15); color: #34d399; }
 .badge-red { background: rgba(239,68,68,0.15); color: #f87171; }
 .badge-violet { background: rgba(139,92,246,0.15); color: #a78bfa; }
 .badge-amber { background: rgba(245,158,11,0.15); color: #f59e0b; }
-video { border-radius: 16px !important; border: 1px solid rgba(255,255,255,0.08) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.3) !important; }
-.stSelectbox > div > div > select { border-radius: 12px !important; border: 1px solid rgba(255,255,255,0.08) !important; font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 13px !important; color: #fff !important; background: #111219 !important; padding: 8px 12px !important; }
+video { border-radius: 16px !important; border: 1px solid var(--card-border) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.15) !important; }
+.stSelectbox > div > div > select { border-radius: 12px !important; border: 1px solid var(--input-border) !important; font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 13px !important; color: var(--input-color) !important; background: var(--select-bg) !important; padding: 8px 12px !important; }
 .stSelectbox label { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
 .stCheckbox label { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 13px; color: var(--ink); }
-.stCheckbox [data-baseweb="checkbox"] { border-color: rgba(255,255,255,0.2) !important; }
+.stCheckbox [data-baseweb="checkbox"] { border-color: var(--ink-soft) !important; }
 .stCheckbox [data-baseweb="checkbox"][aria-checked="true"] { background: var(--violet) !important; border-color: var(--violet) !important; }
-.stNumberInput > div > div > input { border-radius: 12px !important; border: 1px solid rgba(255,255,255,0.08) !important; font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 13px !important; color: #fff !important; background: #111219 !important; }
-.footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.04); font-size: 12px; color: var(--ink-soft); }
+.stNumberInput > div > div > input { border-radius: 12px !important; border: 1px solid var(--input-border) !important; font-family: 'Plus Jakarta Sans', sans-serif !important; font-size: 13px !important; color: var(--input-color) !important; background: var(--select-bg) !important; }
+.footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--hr-color); font-size: 12px; color: var(--ink-soft); }
 .footer a { color: var(--violet) !important; text-decoration: none; }
 .footer a:hover { color: #a78bfa !important; }
 </style>"""
@@ -528,6 +565,18 @@ def _do_render(start_val, end_val, show_sub, sub_color, aspect, mirror, speed_st
 def main():
     st.set_page_config(page_title=APP_NAME, page_icon="⚡", layout="centered")
     st.markdown(CSS, unsafe_allow_html=True); _init()
+
+    # ── Theme toggle ────────────────────────────────────
+    st.markdown(f"<style>{_theme_css()}</style>", unsafe_allow_html=True)
+    col_m1, col_m2, col_m3 = st.columns([1, 1, 1])
+    with col_m1:
+        theme = st.session_state.get("theme", "dark")
+        icon = "☀️" if theme == "light" else "🌙"
+        label = "Terang" if theme == "light" else "Gelap"
+        if st.button(f"{icon} {label}", use_container_width=True):
+            st.session_state.theme = "light" if theme == "dark" else "dark"
+            st.rerun()
+
     step = st.session_state.get("step", "input")
     if step == "input": _step_input()
     elif step == "processing": _step_processing()
