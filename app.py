@@ -343,6 +343,7 @@ def _step_moments():
     st.markdown('<hr>', unsafe_allow_html=True)
 
     # --- Trimmed preview ---
+    preview_path = None
     if has_video:
         preview_path = os.path.join(st.session_state.wd, f"preview_{int(mom.start_time)}_{int(mom.end_time)}.mp4")
         if not Path(preview_path).exists():
@@ -390,10 +391,9 @@ def _step_moments():
     with col_r1:
         render_btn = st.button("🎬 Render Klip", type="primary", use_container_width=True, disabled=st.session_state.get("rendering", False))
     with col_r2:
-        if has_video and Path(preview_path).exists():
-            # Regenerate preview with current trim if changed
+        if preview_path and Path(preview_path).exists():
             if st.button("🔄 Refresh Preview", use_container_width=True):
-                if preview_path and Path(preview_path).exists(): os.remove(preview_path)
+                if Path(preview_path).exists(): os.remove(preview_path)
                 st.rerun()
     with col_r3:
         if st.button("⬅️ Back", use_container_width=True): _reset_all(); st.rerun()
