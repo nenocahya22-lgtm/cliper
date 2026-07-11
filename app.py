@@ -217,6 +217,15 @@ def _step_input():
             label_map = {"9:16": "📱 TikTok/Shorts", "16:9": "🖥️ YouTube/FB", "1:1": "📷 Instagram"}
             platform = label_map.get(preset.get("label", ""), "")
             st.markdown(f'<p style="font-size:12px;color:var(--ink-soft);margin:38px 0 0;line-height:1.4">{"" if not platform else f"Cocok untuk <strong>{platform}</strong>"}</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size:12px;font-weight:600;color:var(--ink-soft);margin:4px 0 6px">🎨 Warna Subtitle</p>', unsafe_allow_html=True)
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            sub_keys = list(SUBTITLE_COLORS.keys())
+            default_sub_idx = sub_keys.index(st.session_state.get("sub_color", "Kuning")) if st.session_state.get("sub_color") in sub_keys else 0
+            sub_val = st.selectbox("Pilih warna subtitle", sub_keys, index=default_sub_idx, key="sub_color_input", label_visibility="collapsed")
+            st.session_state.sub_color = sub_val
+        with col_s2:
+            st.markdown(f'<p style="font-size:12px;color:var(--ink-soft);margin:38px 0 0;line-height:1.4">Subtitle otomatis muncul di klip <strong>{sub_val.lower()}</strong></p>', unsafe_allow_html=True)
 
         # ── Cookies.txt upload (bypass YouTube 403) ────
         with st.expander("🍪 Cookies YouTube (bypass 403)"):
@@ -474,7 +483,7 @@ def _step_moments():
     st.markdown('<p style="font-size:14px;font-weight:700;color:#fff;margin:20px 0 12px">✂️ Editor</p>', unsafe_allow_html=True)
     SubtitleGenerator, VideoProcessor, SUBTITLE_COLORS, ASPECT_PRESETS = _get_editor()
     col_o1, col_o2, col_o3 = st.columns(3)
-    with col_o1: sub_color = st.selectbox("🎨 Warna Subtitle", list(SUBTITLE_COLORS.keys()), index=0, key="sub_color")
+    with col_o1: sub_color = st.selectbox("🎨 Warna Subtitle", list(SUBTITLE_COLORS.keys()), index=list(SUBTITLE_COLORS.keys()).index(st.session_state.get("sub_color", "Kuning")) if st.session_state.get("sub_color") in SUBTITLE_COLORS else 0, key="sub_color")
     with col_o2: aspect = st.selectbox("📐 Aspect Ratio", list(ASPECT_PRESETS.keys()), index=list(ASPECT_PRESETS.keys()).index(st.session_state.get("aspect", "Portrait 9:16 (Shorts/TikTok)")) if st.session_state.get("aspect") in ASPECT_PRESETS else 0, key="aspect")
     with col_o3: mirror = st.checkbox("🪞 Mirror", value=st.session_state.get("mirror", True), key="mirror")
     col_o4, col_o5, col_o6 = st.columns(3)
