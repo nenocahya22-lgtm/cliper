@@ -158,6 +158,15 @@ def _step_input():
               </div>
             </div>
             """, unsafe_allow_html=True)
+        # ── Opsi pre-processing ────────────────────────
+        st.markdown('<hr style="border-color:rgba(255,255,255,0.04);margin:16px 0">', unsafe_allow_html=True)
+        col_opt1, col_opt2 = st.columns(2)
+        with col_opt1:
+            mirror_val = st.checkbox("🪞 Mirror (Horizontal)", value=st.session_state.get("mirror", True), key="mirror_input")
+            st.session_state.mirror = mirror_val
+        with col_opt2:
+            st.markdown('<p style="font-size:11px;color:var(--ink-soft);margin:28px 0 0;line-height:1.4">Membalik video secara horizontal — cocok untuk <strong>TikTok/Shorts/reels</strong> biar lebih engaging.</p>', unsafe_allow_html=True)
+
         # ── Cookies.txt upload (bypass YouTube 403) ────
         with st.expander("🍪 Cookies YouTube (bypass 403)"):
             st.markdown('<p style="font-size:12px;color:var(--ink-soft);margin:0 0 8px">Upload <code>cookies.txt</code> dari browser (pakai ekstensi "Get cookies.txt") supaya yt-dlp bisa bypass block YouTube.</p>', unsafe_allow_html=True)
@@ -386,7 +395,7 @@ def _step_moments():
     col_o1, col_o2, col_o3 = st.columns(3)
     with col_o1: sub_color = st.selectbox("🎨 Warna Subtitle", list(SUBTITLE_COLORS.keys()), index=0, key="sub_color")
     with col_o2: aspect = st.selectbox("📐 Aspect Ratio", list(ASPECT_PRESETS.keys()), index=0, key="aspect")
-    with col_o3: mirror = st.checkbox("🪞 Mirror", value=True, key="mirror")
+    with col_o3: mirror = st.checkbox("🪞 Mirror", value=st.session_state.get("mirror", True), key="mirror")
     col_o4, col_o5, col_o6 = st.columns(3)
     with col_o4: show_sub = st.checkbox("💬 Subtitle", value=True, key="show_sub")
     with col_o5: speed_str = st.selectbox("⚡ Speed", ["1.0x", "1.05x", "1.1x", "1.15x"], index=0, key="speed")
