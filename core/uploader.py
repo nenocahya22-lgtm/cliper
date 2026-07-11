@@ -1,6 +1,9 @@
 import os, json, time
 from pathlib import Path
 
+# Biar Playwright pake system chromium (bukan download browser sendiri)
+os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "0")
+
 ACCOUNTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "accounts")
 
 class Uploader:
@@ -102,12 +105,14 @@ Tekan ENTER setelah login selesai...
                 pass
 
     @staticmethod
-    def _launch_browser():
-        """Launch Playwright browser - headless=True for cloud, fallback to headed locally."""
+    def _launch_browser(headless: bool):
         from playwright.sync_api import sync_playwright
-        headless = os.environ.get("STREAMLIT_CLOUD", "") or os.environ.get("STREAMLIT_RUN_ON_SAVE", "")
-        with sync_playwright() as p:
-            return p.chromium.launch(headless=bool(headless))
+        p = sync_playwright().start()
+        browser = p.chromium.launch(
+            headless=headless,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] if headless else []
+        )
+        return p, browser
 
     @staticmethod
     def upload_youtube(video_path: str, title: str, description: str = "",
@@ -120,9 +125,13 @@ Tekan ENTER setelah login selesai...
             from playwright.sync_api import sync_playwright
         except ImportError:
             raise Exception("Playwright tidak terinstall. Jalankan: playwright install chromium")
+
+        is_cloud = "DISPLAY" not in os.environ
         with sync_playwright() as p:
-            is_cloud = bool(os.environ.get("STREAMLIT_CLOUD", "") or os.environ.get("STREAMLIT_RUN_ON_SAVE", ""))
-            browser = p.chromium.launch(headless=is_cloud, args=["--no-sandbox", "--disable-setuid-sandbox"] if is_cloud else [])
+            browser = p.chromium.launch(
+                headless=is_cloud,
+                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] if is_cloud else []
+            )
             ctx = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
             )
@@ -161,71 +170,58 @@ Tekan ENTER setelah login selesai...
             browser.close()
 
     @staticmethod
-    def upload_tiktok(video_path: str, caption: str = ""):
-        cookies = Uploader.load_cookies("tiktok")
+    def _do_upload(platform: str, upload_url: str, video_path: str, title_or_caption: str):
+        """Generic upload using Playwright - headless on cloud, headed locally."""
+        cookies = Uploader.load_cookies(platform)
         if not cookies:
-            raise Exception("Login dulu! Jalankan: python farm.py --login tiktok")
-
+            raise Exception(f"Login dulu! Simpan cookies {platform} di menu Settings.")
         try:
             from playwright.sync_api import sync_playwright
         except ImportError:
             raise Exception("Playwright tidak terinstall. Jalankan: playwright install chromium")
+        is_cloud = "DISPLAY" not in os.environ
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False)
-            ctx = browser.new_context()
+            browser = p.chromium.launch(
+                headless=is_cloud,
+                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] if is_cloud else []
+            )
+            ctx = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+            )
             ctx.add_cookies(cookies)
             page = ctx.new_page()
-            page.goto("https://www.tiktok.com/upload")
+            page.goto(upload_url, wait_until="domcontentloaded", timeout=30000)
             time.sleep(3)
 
             file_input = page.locator("input[type=file]").first
             file_input.set_input_files(video_path)
             time.sleep(5)
 
-            if caption:
-                page.locator(".public-DraftEditor-content").click()
-                page.locator(".public-DraftEditor-content").fill(caption)
-                time.sleep(1)
+            if title_or_caption:
+                try:
+                    text_inputs = page.locator('[contenteditable="true"], textarea, input[type="text"]').first
+                    text_inputs.click()
+                    text_inputs.fill(title_or_caption)
+                    time.sleep(1)
+                except:
+                    pass
 
-            page.click("[data-e2e='post_video_btn']")
-            print(f"[UPLOAD] TikTok: {caption[:50]}")
-            time.sleep(5)
+            try:
+                page.click("[aria-label='Publikasikan'], [data-e2e='post_video_btn'], text=Posting", timeout=10000)
+            except:
+                pass
+
+            print(f"[UPLOAD] {platform}: {title_or_caption[:50]}")
+            time.sleep(3)
             browser.close()
 
     @staticmethod
+    def upload_tiktok(video_path: str, caption: str = ""):
+        Uploader._do_upload("tiktok", "https://www.tiktok.com/upload", video_path, caption)
+
+    @staticmethod
     def upload_facebook(video_path: str, caption: str = ""):
-        cookies = Uploader.load_cookies("facebook")
-        if not cookies:
-            raise Exception("Login dulu! Jalankan: python farm.py --login facebook")
-
-        try:
-            from playwright.sync_api import sync_playwright
-        except ImportError:
-            raise Exception("Playwright tidak terinstall. Jalankan: playwright install chromium")
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False)
-            ctx = browser.new_context()
-            ctx.add_cookies(cookies)
-            page = ctx.new_page()
-            page.goto("https://www.facebook.com")
-            time.sleep(3)
-
-            page.goto("https://www.facebook.com/upload")
-            time.sleep(3)
-
-            file_input = page.locator("input[type=file]").first
-            file_input.set_input_files(video_path)
-            time.sleep(5)
-
-            if caption:
-                page.locator("[contenteditable='true']").first.click()
-                page.keyboard.type(caption, delay=50)
-                time.sleep(1)
-
-            page.click("text=Posting")
-            print(f"[UPLOAD] Facebook: {caption[:50]}")
-            time.sleep(5)
-            browser.close()
+        Uploader._do_upload("facebook", "https://www.facebook.com/upload", video_path, caption)
 
     @staticmethod
     def upload(platform: str, video_path: str, title: str, description: str = "",

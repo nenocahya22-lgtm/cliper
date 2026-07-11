@@ -1,3 +1,2 @@
 ffmpeg
 chromium-browser
-chromium-chromedriver
