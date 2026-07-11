@@ -105,16 +105,6 @@ Tekan ENTER setelah login selesai...
                 pass
 
     @staticmethod
-    def _launch_browser(headless: bool):
-        from playwright.sync_api import sync_playwright
-        p = sync_playwright().start()
-        browser = p.chromium.launch(
-            headless=headless,
-            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] if headless else []
-        )
-        return p, browser
-
-    @staticmethod
     def upload_youtube(video_path: str, title: str, description: str = "",
                        schedule_ts: int = None):
         cookies = Uploader.load_cookies("youtube")
@@ -130,6 +120,7 @@ Tekan ENTER setelah login selesai...
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=is_cloud,
+                executable_path="/usr/bin/chromium-browser" if is_cloud else None,
                 args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] if is_cloud else []
             )
             ctx = browser.new_context(
@@ -183,6 +174,7 @@ Tekan ENTER setelah login selesai...
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=is_cloud,
+                executable_path="/usr/bin/chromium-browser" if is_cloud else None,
                 args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] if is_cloud else []
             )
             ctx = browser.new_context(
