@@ -374,6 +374,48 @@ def _step_render():
             with open(ov, "rb") as f:
                 st.download_button("📥 Download Video", f, file_name=os.path.basename(ov), mime="video/mp4", use_container_width=True, type="primary")
             st.markdown('<hr>', unsafe_allow_html=True)
+
+            # Upload buttons
+            st.markdown(f'<p style="font-size:13px;font-weight:700;color:#fff;margin:0 0 8px">📤 Upload ke Platform</p>', unsafe_allow_html=True)
+            col_u1, col_u2, col_u3 = st.columns(3)
+            up_yt = col_u1.button("▶️ YouTube", use_container_width=True, disabled=st.session_state.get("_uploading", False))
+            up_tt = col_u2.button("🎵 TikTok", use_container_width=True, disabled=st.session_state.get("_uploading", False))
+            up_fb = col_u3.button("📘 Facebook", use_container_width=True, disabled=st.session_state.get("_uploading", False))
+
+            if up_yt or up_tt or up_fb:
+                plat = "youtube" if up_yt else "tiktok" if up_tt else "facebook"
+                st.session_state._uploading = True
+                try:
+                    from core.uploader import Uploader
+                    Uploader.upload(plat, ov, res.title[:100], "")
+                    st.success(f"✅ Terupload ke {plat.title()}!")
+                except Exception as e:
+                    err = str(e)
+                    if "cookies" in err.lower() or "login" in err.lower():
+                        st.warning("🔑 Belum ada cookies. Buka menu **Settings > Cookies** untuk setup.")
+                    else:
+                        st.error(f"Gagal upload: {err[:100]}")
+                st.session_state._uploading = False
+                st.rerun()
+
+            # Cookie settings
+            with st.expander("🔑 Settings Cookies (untuk Upload)"):
+                plat_sel = st.selectbox("Platform", ["youtube", "tiktok", "facebook"], key="cookie_plat")
+                cookies_txt = st.text_area("Tempel Cookies JSON", placeholder='[{ "name": "...", "value": "...", "domain": ".youtube.com", "path": "/" }]', height=100)
+                if st.button("💾 Simpan Cookies", use_container_width=True):
+                    if cookies_txt.strip():
+                        try:
+                            import json
+                            cdata = json.loads(cookies_txt.strip())
+                            if isinstance(cdata, list):
+                                from core.uploader import Uploader
+                                Uploader.save_cookies(plat_sel, cdata)
+                                st.success(f"✅ Cookies {plat_sel.title()} tersimpan!")
+                            else: st.error("Format harus array/list")
+                        except Exception as ex:
+                            st.error(f"Error: {ex}")
+
+            st.markdown('<hr>', unsafe_allow_html=True)
             c_new, _ = st.columns(2)
             if c_new.button("➕ Buat Klip Baru", use_container_width=True, type="primary"): _reset_all(); st.rerun()
 

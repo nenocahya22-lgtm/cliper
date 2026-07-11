@@ -102,25 +102,35 @@ Tekan ENTER setelah login selesai...
                 pass
 
     @staticmethod
+    def _launch_browser():
+        """Launch Playwright browser - headless=True for cloud, fallback to headed locally."""
+        from playwright.sync_api import sync_playwright
+        headless = os.environ.get("STREAMLIT_CLOUD", "") or os.environ.get("STREAMLIT_RUN_ON_SAVE", "")
+        with sync_playwright() as p:
+            return p.chromium.launch(headless=bool(headless))
+
+    @staticmethod
     def upload_youtube(video_path: str, title: str, description: str = "",
                        schedule_ts: int = None):
         cookies = Uploader.load_cookies("youtube")
         if not cookies:
-            raise Exception("Login dulu! Jalankan: python farm.py --login youtube")
+            raise Exception("Login dulu! Simpan cookies YouTube di halaman Settings.")
 
         try:
             from playwright.sync_api import sync_playwright
         except ImportError:
             raise Exception("Playwright tidak terinstall. Jalankan: playwright install chromium")
         with sync_playwright() as p:
-            browser = p.chromium.launch(headless=False)
-            ctx = browser.new_context()
+            is_cloud = bool(os.environ.get("STREAMLIT_CLOUD", "") or os.environ.get("STREAMLIT_RUN_ON_SAVE", ""))
+            browser = p.chromium.launch(headless=is_cloud, args=["--no-sandbox", "--disable-setuid-sandbox"] if is_cloud else [])
+            ctx = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+            )
             ctx.add_cookies(cookies)
             page = ctx.new_page()
-            page.goto("https://studio.youtube.com")
-            time.sleep(3)
-
-            page.goto("https://studio.youtube.com/upload")
+            page.goto("https://studio.youtube.com", wait_until="domcontentloaded", timeout=30000)
+            time.sleep(2)
+            page.goto("https://studio.youtube.com/upload", wait_until="domcontentloaded", timeout=30000)
             time.sleep(2)
 
             file_input = page.locator("input[type=file]").first
@@ -139,16 +149,15 @@ Tekan ENTER setelah login selesai...
                 page.click("text=Jadwalkan")
                 time.sleep(1)
 
-            page.click("[aria-label='Berikutnya']")
-            time.sleep(2)
-            page.click("[aria-label='Berikutnya']")
-            time.sleep(2)
-            page.click("[aria-label='Berikutnya']")
-            time.sleep(2)
-            page.click("[aria-label='Publikasikan']")
+            for step_name in ["Berikutnya", "Berikutnya", "Berikutnya", "Publikasikan"]:
+                try:
+                    page.click(f"[aria-label='{step_name}']", timeout=5000)
+                    time.sleep(2)
+                except:
+                    pass
 
             print(f"[UPLOAD] YouTube: {title}")
-            time.sleep(5)
+            time.sleep(3)
             browser.close()
 
     @staticmethod
