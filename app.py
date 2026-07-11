@@ -162,54 +162,100 @@ def _step_input():
             st.session_state.step = "processing"
             st.rerun()
 
-# ── Step 2: Processing ──────────────────────────────────
+# ── Step 2: Processing (background thread) ────────────
 def _step_processing():
     st.markdown('<div class="main-wrap">', unsafe_allow_html=True)
     st.markdown('<h2 style="font-size:24px;font-weight:700;margin:0 0 8px">Memproses Video...</h2>', unsafe_allow_html=True)
     st.markdown('<p style="color:var(--ink-soft);font-size:14px;margin:0 0 24px">Mengunduh, mentranskripsi, dan menganalisis momen viral</p>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
+
+    # Start background thread on first call
+    if not st.session_state.get("processing", False):
+        st.session_state.processing = True
+        st.session_state.processing_done = False
+        st.session_state.processing_error = ""
+        st.session_state.processing_progress = 0.0
+        st.session_state.processing_msg = "Memulai..."
+        import threading
+        threading.Thread(target=_do_process, daemon=True).start()
+        st.rerun()
+        return
+
+    # Poll for progress
+    prog = st.progress(st.session_state.get("processing_progress", 0.0))
+    msg = st.session_state.get("processing_msg", "")
+    st.markdown(f'<p style="text-align:center;font-size:14px;font-weight:600;color:#fff">{msg}</p>', unsafe_allow_html=True)
+
+    if st.session_state.get("processing_done", False):
+        if st.session_state.get("processing_error"):
+            st.error(st.session_state.processing_error)
+            if st.button("🔄 Coba Lagi", use_container_width=True):
+                st.session_state.processing = False; st.session_state.step = "input"; st.rerun()
+        else:
+            prog.progress(1.0)
+            st.markdown(f'<p style="text-align:center;font-size:14px;font-weight:600;color:#34d399">✅ Selesai! Pilih momen di bawah.</p>', unsafe_allow_html=True)
+            time.sleep(0.5)
+            st.session_state.step = "moments"
+            st.rerun()
+    else:
+        # Still processing — rerun to poll again
+        time.sleep(1)
+        st.rerun()
+
+# ── Background processing thread ────────────────────────
+def _do_process():
+    """Run all processing in background thread to avoid Streamlit Cloud timeout."""
     url = st.session_state.get("vurl", "")
     wd = st.session_state.wd
-    if not url: st.session_state.step = "input"; st.rerun(); return
-    ViralMomentFinder, ProcessingResult = _get_finder()
-    res = ProcessingResult()
-    prog = st.progress(0)
-    status = st.empty()
-    def set_status(msg, pct, detail=""):
-        html = f'<div style="text-align:center;padding:8px"><p style="font-size:14px;font-weight:600;color:#fff;margin:0">{msg}</p>'
-        if detail: html += f'<p style="font-size:12px;color:var(--ink-soft);margin:4px 0 0">{detail}</p>'
-        html += '</div>'
-        status.markdown(html, unsafe_allow_html=True)
-        prog.progress(pct)
+    if not url:
+        st.session_state.processing_error = "URL tidak valid"
+        st.session_state.processing_done = True
+        return
     try:
+        import yt_dlp
         VideoDownloader = _get_downloader()
-        set_status("Mendapatkan info video...", 0.05)
+
+        st.session_state.processing_msg = "Mendapatkan info video..."
+        st.session_state.processing_progress = 0.05
         info = {}
         try:
-            import yt_dlp
             with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
                 info = ydl.extract_info(url, download=False) or {}
         except: pass
         title = info.get("title", "Unknown"); dur = info.get("duration", 0) or 0
+
+        ViralMomentFinder, ProcessingResult = _get_finder()
+        res = ProcessingResult()
         res.title = title; res.duration = dur
-        set_status("Mengunduh audio...", 0.2, "Mengonversi ke WAV 16kHz")
+
+        st.session_state.processing_msg = "Mengunduh audio..."
+        st.session_state.processing_progress = 0.2
         audio, _, _ = VideoDownloader.download_audio(url, wd, max_dur=600)
-        set_status("Mentranskripsi dengan Whisper AI...", 0.4, "Mengenali kata-kata dalam video")
+
+        st.session_state.processing_msg = "Mentranskripsi dengan Whisper AI..."
+        st.session_state.processing_progress = 0.4
         AudioTranscriber, WordTimestamp = _get_transcriber()
         text, wts = AudioTranscriber.transcribe(audio)
         if text: res.transcript = text; res.word_timestamps = wts
-        set_status("Menganalisis momen viral...", 0.65, "Mendeteksi Hook, Klimaks, dan CTA")
+
+        st.session_state.processing_msg = "Menganalisis momen viral..."
+        st.session_state.processing_progress = 0.65
         res.viral_moments = ViralMomentFinder.find_moments(res.transcript or "", dur, res.word_timestamps, use_llm=False)
-        set_status("Mengunduh klip video...", 0.85, "Mendapatkan video resolusi tinggi")
+
+        st.session_state.processing_msg = "Mengunduh klip video..."
+        st.session_state.processing_progress = 0.85
         vp = VideoDownloader.download_video_clip(url, wd, 0, min(dur+5, 600))
         if vp: res.video_path = vp
-        st.session_state.result = res; st.session_state.step = "moments"
-        prog.progress(1.0); set_status("✅ Selesai! Pilih momen di bawah.", 1.0)
-        time.sleep(0.5); st.rerun()
+
+        st.session_state.result = res
+        st.session_state.processing_progress = 1.0
+        st.session_state.processing_msg = "Selesai!"
+        st.session_state.processing_done = True
+
     except Exception as e:
-        st.error(f"Gagal memproses video: {str(e)[:200]}")
-        if st.button("🔄 Coba Lagi", use_container_width=True):
-            st.session_state.step = "input"; st.rerun()
+        st.session_state.processing_error = f"Gagal memproses video: {str(e)[:200]}"
+        st.session_state.processing_done = True
+        print(f"[process error] {e}")
 
 # ── Step 3: Pick Moment ─────────────────────────────────
 def _step_moments():
