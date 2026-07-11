@@ -100,6 +100,34 @@ video { border-radius: 16px !important; border: 1px solid rgba(255,255,255,0.08)
 .footer a:hover { color: #a78bfa !important; }
 </style>"""
 
+# ── YouTube helpers ─────────────────────────────────────
+def _extract_yt_id(url: str) -> str:
+    import re
+    patterns = [
+        r'(?:youtube\.com|youtu\.be)/(?:watch\?v=|embed/|v/|shorts/|)([\w-]{11})',
+        r'youtu\.be/([\w-]{11})',
+    ]
+    for p in patterns:
+        m = re.search(p, url)
+        if m: return m.group(1)
+    return ""
+
+def _yt_thumbnail(video_id: str) -> str:
+    return f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg"
+
+@st.cache_data(ttl=3600)
+def _fetch_yt_title(video_id: str) -> tuple:
+    """Fetch video title and duration via oEmbed. Returns (title, channel_name) or empty strings."""
+    try:
+        import urllib.request, json
+        url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        resp = urllib.request.urlopen(req, timeout=5)
+        data = json.loads(resp.read().decode())
+        return data.get("title", ""), data.get("author_name", "")
+    except:
+        return "", ""
+
 # ── Step 1: Input ───────────────────────────────────────
 def _step_input():
     st.markdown(f"""
@@ -114,6 +142,22 @@ def _step_input():
     st.markdown('</div>', unsafe_allow_html=True)
     if url:
         st.session_state.vurl = url
+        # Show YouTube thumbnail preview kaya WayinVideo
+        vid = _extract_yt_id(url)
+        if vid:
+            thumb_url = _yt_thumbnail(vid)
+            title, channel = _fetch_yt_title(vid)
+            st.markdown(f"""
+            <div style="display:flex;gap:16px;align-items:center;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:16px;padding:12px;margin-bottom:16px;text-align:left">
+              <img src="{thumb_url}" style="width:180px;height:101px;border-radius:10px;object-fit:cover;flex-shrink:0;border:1px solid rgba(255,255,255,0.08)"
+                   onerror="this.style.display='none'"
+                   alt="YouTube thumbnail">
+              <div style="flex:1;min-width:0">
+                <p style="font-size:15px;font-weight:700;color:#fff;margin:0 0 4px;line-height:1.2">{title if title else 'Video YouTube'}</p>
+                <p style="font-size:12px;color:var(--ink-soft);margin:0">{'🎬 ' + channel if channel else '📺 YouTube'}</p>
+              </div>
+            </div>
+            """, unsafe_allow_html=True)
         if st.button("🚀 Proses Video", type="primary", use_container_width=True):
             st.session_state.step = "processing"
             st.rerun()
