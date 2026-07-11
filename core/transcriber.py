@@ -61,7 +61,9 @@ class AudioTranscriber:
             gpu = cls.check_gpu()
             device = "cuda" if gpu["cuda"] else "cpu"
             print(f"[Whisper] GPU: {gpu['cuda']} | Device: {device}")
-            cls._model = whisper.load_model(WHISPER_MODEL_SIZE, device=device)
+            cls._model = whisper.load_model(WHISPER_MODEL_SIZE)
+            if device == "cuda":
+                cls._model = cls._model.to("cuda")
         return cls._model
 
     @staticmethod
@@ -75,7 +77,7 @@ class AudioTranscriber:
 
         all_words = []
         try:
-            result = model.transcribe(audio_path, word_timestamps=True, beam_size=1)
+            result = model.transcribe(audio_path, word_timestamps=True)
             for seg in result.get("segments", []):
                 if seg.get("words"):
                     for w in seg["words"]:
