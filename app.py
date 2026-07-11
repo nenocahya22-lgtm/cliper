@@ -378,12 +378,12 @@ def _step_moments():
 
     # --- Trim controls ---
     st.markdown('<p style="font-size:12px;font-weight:600;color:var(--ink-soft);margin:12px 0 4px">✂️ Trim Waktu (geser sesuai keinginan)</p>', unsafe_allow_html=True)
-    clip_dur = mom.end_time - mom.start_time
+    clip_dur = float(mom.end_time - mom.start_time)
     c_t1, c_t2 = st.columns(2)
-    default_start = max(0.0, mom.start_time)
-    default_end = min(default_start + clip_dur, res.duration)
-    with c_t1: start_val = c_t1.number_input("Mulai (detik)", 0.0, max(0.0, res.duration-5), default_start, 0.5, key="trim_start")
-    with c_t2: end_val = c_t2.number_input("Selesai (detik)", start_val+5, max(start_val+5, res.duration), max(start_val+5, min(default_end, res.duration)), 0.5, key="trim_end")
+    default_start = max(0.0, float(mom.start_time))
+    default_end = min(default_start + clip_dur, float(res.duration))
+    with c_t1: start_val = c_t1.number_input("Mulai (detik)", 0.0, max(5.0, float(res.duration)), default_start, 0.5, key="trim_start")
+    with c_t2: end_val = c_t2.number_input("Selesai (detik)", float(start_val)+5, max(float(start_val)+5, float(res.duration)), max(float(start_val)+5, min(default_end, float(res.duration))), 0.5, key="trim_end")
 
     # --- Render + Action buttons ---
     st.markdown('<hr>', unsafe_allow_html=True)
