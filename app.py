@@ -2,13 +2,59 @@
 Cliper — Simple YouTube Clip Maker
 Like WayinVideo: paste URL → get video clip
 """
-import os, time, uuid, subprocess, shutil
+import os, time, uuid, subprocess, shutil, json
 from pathlib import Path
 import streamlit as st
 
 APP_NAME = "Cliper"
 OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "output")
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+# ── BGM Library ─────────────────────────────────────────
+LIBRARY_DIR = os.path.join(os.path.dirname(__file__), "library", "bgm")
+LIBRARY_INDEX = os.path.join(LIBRARY_DIR, "index.json")
+
+def _library_init():
+    os.makedirs(LIBRARY_DIR, exist_ok=True)
+    if not os.path.exists(LIBRARY_INDEX):
+        with open(LIBRARY_INDEX, "w", encoding="utf-8") as f:
+            f.write("[]")
+
+def _library_list() -> list:
+    _library_init()
+    try:
+        with open(LIBRARY_INDEX, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except:
+        return []
+
+def _library_save(name: str, src_path: str) -> dict:
+    _library_init()
+    lib_id = uuid.uuid4().hex[:12]
+    ext = Path(name).suffix if Path(name).suffix else ".mp3"
+    dest = os.path.join(LIBRARY_DIR, f"{lib_id}{ext}")
+    shutil.copy2(src_path, dest)
+    sz = os.path.getsize(dest)
+    entry = {
+        "id": lib_id, "name": name,
+        "path": dest, "size": sz,
+        "added": time.strftime("%Y-%m-%d %H:%M")
+    }
+    items = _library_list()
+    items.append(entry)
+    with open(LIBRARY_INDEX, "w", encoding="utf-8") as f:
+        json.dump(items, f, indent=2, ensure_ascii=False)
+    return entry
+
+def _library_delete(lib_id: str):
+    items = _library_list()
+    found = [i for i in items if i["id"] == lib_id]
+    items = [i for i in items if i["id"] != lib_id]
+    with open(LIBRARY_INDEX, "w", encoding="utf-8") as f:
+        json.dump(items, f, indent=2, ensure_ascii=False)
+    for i in found:
+        try: Path(i["path"]).unlink(missing_ok=True)
+        except: pass
 
 # ── Lazy imports ────────────────────────────────────────
 def _get_downloader():
@@ -231,11 +277,21 @@ def _step_input():
         st.markdown('<p style="font-size:12px;font-weight:600;color:var(--ink-soft);margin:4px 0 6px">🎵 Background Music (opsional)</p>', unsafe_allow_html=True)
         uploaded_bgm = st.file_uploader("Pilih file MP3/WAV/M4A", type=["mp3", "wav", "m4a", "ogg"], key="bgm_upload", label_visibility="collapsed")
         if uploaded_bgm:
-            bgm_path = os.path.join(st.session_state.wd, f"bgm_{uuid.uuid4().hex[:8]}.mp3")
+            bgm_path = os.path.join(st.session_state.wd, f"bgm_{uuid.uuid4().hex[:8]}{Path(uploaded_bgm.name).suffix or '.mp3'}")
             with open(bgm_path, "wb") as f:
                 f.write(uploaded_bgm.read())
             st.session_state.bgm_path = bgm_path
             st.success(f"✅ BGM: {uploaded_bgm.name} siap!")
+            col_sb1, col_sb2 = st.columns([3, 1])
+            with col_sb2:
+                already_saved = any(i["name"] == uploaded_bgm.name for i in _library_list())
+                if not already_saved:
+                    if st.button("💾 Save to Library", key="save_bgm_lib", use_container_width=True):
+                        _library_save(uploaded_bgm.name, bgm_path)
+                        st.success("✅ Tersimpan ke Library!")
+                        st.rerun()
+                else:
+                    st.markdown('<p style="font-size:12px;color:var(--ink-soft);margin:6px 0 0;text-align:center">✅ Sudah di Library</p>', unsafe_allow_html=True)
         col_b1, col_b2 = st.columns(2)
         with col_b1:
             bgm_vol = st.slider("🎵 Volume BGM", 0, 100, st.session_state.get("bgm_volume", 30), 5, key="bgm_vol_input")
@@ -243,6 +299,46 @@ def _step_input():
         with col_b2:
             orig_vol = st.slider("🔊 Volume Audio Asli", 0, 100, st.session_state.get("original_volume", 100), 5, key="orig_vol_input")
             st.session_state.original_volume = orig_vol
+
+        # ── My Library — favorit BGM ──────────────────────
+        with st.expander("📚 My Library", expanded=False):
+            items = _library_list()
+            if not items:
+                st.markdown('<p style="font-size:13px;color:var(--ink-soft);margin:0">Belum ada BGM favorit. Upload BGM dulu, lalu klik <strong>Save to Library</strong>.</p>', unsafe_allow_html=True)
+            else:
+                for item in items:
+                    sz_mb = item["size"] / (1024*1024)
+                    is_active = st.session_state.get("bgm_path", "") == item["path"]
+                    active_cls = 'style="border-color:#8b5cf6;background:rgba(139,92,246,0.06)"' if is_active else ""
+                    st.markdown(f"""
+                    <div {active_cls} style="display:flex;align-items:center;gap:12px;background:var(--card-bg);border:1px solid var(--card-border);border-radius:12px;padding:10px 14px;margin-bottom:8px;transition:all 0.2s">
+                      <div style="font-size:24px;flex-shrink:0">🎵</div>
+                      <div style="flex:1;min-width:0">
+                        <p style="font-size:13px;font-weight:600;color:var(--ink);margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{item["name"]}</p>
+                        <p style="font-size:11px;color:var(--ink-soft);margin:2px 0 0">{sz_mb:.1f} MB · {item["added"]}</p>
+                      </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    col_la, col_lb, col_lc = st.columns([3, 1, 1])
+                    with col_lb:
+                        if not is_active:
+                            if st.button("🎯 Pilih", key=f"lib_sel_{item['id']}", use_container_width=True):
+                                if Path(item["path"]).exists():
+                                    st.session_state.bgm_path = item["path"]
+                                    st.rerun()
+                                else:
+                                    _library_delete(item["id"])
+                                    st.warning("File tidak ditemukan, dihapus dari library")
+                                    st.rerun()
+                        else:
+                            st.markdown('<p style="font-size:12px;color:#8b5cf6;text-align:center;margin:6px 0 0">✅ Aktif</p>', unsafe_allow_html=True)
+                    with col_lc:
+                        if st.button("🗑️", key=f"lib_del_{item['id']}", use_container_width=True):
+                            _library_delete(item["id"])
+                            # If currently using this BGM, clear it
+                            if st.session_state.get("bgm_path", "") == item["path"]:
+                                st.session_state.bgm_path = ""
+                            st.rerun()
 
         # ── Cookies.txt upload (bypass YouTube 403) ────
         with st.expander("🍪 Cookies YouTube (bypass 403)"):
