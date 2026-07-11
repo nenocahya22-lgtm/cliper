@@ -331,7 +331,13 @@ def _step_input():
                                     st.warning("File tidak ditemukan, dihapus dari library")
                                     st.rerun()
                         else:
-                            st.markdown('<p style="font-size:12px;color:#8b5cf6;text-align:center;margin:6px 0 0">✅ Aktif</p>', unsafe_allow_html=True)
+                            col_la2, col_lb2 = st.columns(2)
+                            with col_la2:
+                                if st.button("✕ Clear", key=f"lib_clear_{item['id']}", use_container_width=True):
+                                    st.session_state.bgm_path = ""
+                                    st.rerun()
+                            with col_lb2:
+                                st.markdown('<p style="font-size:12px;color:#8b5cf6;text-align:center;margin:6px 0 0">✅ Aktif</p>', unsafe_allow_html=True)
                     with col_lc:
                         if st.button("🗑️", key=f"lib_del_{item['id']}", use_container_width=True):
                             _library_delete(item["id"])
