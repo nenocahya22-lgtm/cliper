@@ -92,8 +92,9 @@ def _get_platform_extractor_args(platform: str) -> dict:
     args = {}
     if platform == "youtube":
         args["youtube"] = {
-            "player_client": ["android"],  # 1 client saja biar payload kecil
-            "skip": ["dash", "hls"],       # skip DASH/HLS manifest — kurangi response size
+            "player_client": ["android", "web"],  # multiple clients for fallback
+            "skip": ["dash", "hls"],
+            "player_skip": ["js", "configs"],
         }
     elif platform == "tiktok":
         args["tiktok"] = {

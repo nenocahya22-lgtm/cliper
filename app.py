@@ -219,7 +219,8 @@ def _do_process():
         st.session_state.processing_progress = 0.05
         info = {}
         try:
-            with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
+            from core.downloader import _default_opts
+            with yt_dlp.YoutubeDL(_default_opts(url)) as ydl:
                 info = ydl.extract_info(url, download=False) or {}
         except: pass
         title = info.get("title", "Unknown"); dur = info.get("duration", 0) or 0
