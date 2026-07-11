@@ -196,13 +196,27 @@ def _step_input():
             </div>
             """, unsafe_allow_html=True)
         # ── Opsi pre-processing ────────────────────────
-        st.markdown('<hr style="border-color:rgba(255,255,255,0.04);margin:16px 0">', unsafe_allow_html=True)
+        st.markdown('<hr style="border-color:var(--hr-color);margin:16px 0">', unsafe_allow_html=True)
+        SubtitleGenerator, VideoProcessor, SUBTITLE_COLORS, ASPECT_PRESETS = _get_editor()
         col_opt1, col_opt2 = st.columns(2)
         with col_opt1:
             mirror_val = st.checkbox("🪞 Mirror (Horizontal)", value=st.session_state.get("mirror", True), key="mirror_input")
             st.session_state.mirror = mirror_val
         with col_opt2:
             st.markdown('<p style="font-size:11px;color:var(--ink-soft);margin:28px 0 0;line-height:1.4">Membalik video secara horizontal — cocok untuk <strong>TikTok/Shorts/reels</strong> biar lebih engaging.</p>', unsafe_allow_html=True)
+        st.markdown('<p style="font-size:12px;font-weight:600;color:var(--ink-soft);margin:4px 0 6px">📐 Format Output</p>', unsafe_allow_html=True)
+        col_a1, col_a2 = st.columns(2)
+        with col_a1:
+            aspect_keys = list(ASPECT_PRESETS.keys())
+            default_idx = aspect_keys.index(st.session_state.get("aspect", "Portrait 9:16 (Shorts/TikTok)")) \
+                if st.session_state.get("aspect") in aspect_keys else 0
+            aspect_val = st.selectbox("Pilih aspek rasio", aspect_keys, index=default_idx, key="aspect_input", label_visibility="collapsed")
+            st.session_state.aspect = aspect_val
+        with col_a2:
+            preset = ASPECT_PRESETS.get(aspect_val, {})
+            label_map = {"9:16": "📱 TikTok/Shorts", "16:9": "🖥️ YouTube/FB", "1:1": "📷 Instagram"}
+            platform = label_map.get(preset.get("label", ""), "")
+            st.markdown(f'<p style="font-size:12px;color:var(--ink-soft);margin:38px 0 0;line-height:1.4">{"" if not platform else f"Cocok untuk <strong>{platform}</strong>"}</p>', unsafe_allow_html=True)
 
         # ── Cookies.txt upload (bypass YouTube 403) ────
         with st.expander("🍪 Cookies YouTube (bypass 403)"):
@@ -461,7 +475,7 @@ def _step_moments():
     SubtitleGenerator, VideoProcessor, SUBTITLE_COLORS, ASPECT_PRESETS = _get_editor()
     col_o1, col_o2, col_o3 = st.columns(3)
     with col_o1: sub_color = st.selectbox("🎨 Warna Subtitle", list(SUBTITLE_COLORS.keys()), index=0, key="sub_color")
-    with col_o2: aspect = st.selectbox("📐 Aspect Ratio", list(ASPECT_PRESETS.keys()), index=0, key="aspect")
+    with col_o2: aspect = st.selectbox("📐 Aspect Ratio", list(ASPECT_PRESETS.keys()), index=list(ASPECT_PRESETS.keys()).index(st.session_state.get("aspect", "Portrait 9:16 (Shorts/TikTok)")) if st.session_state.get("aspect") in ASPECT_PRESETS else 0, key="aspect")
     with col_o3: mirror = st.checkbox("🪞 Mirror", value=st.session_state.get("mirror", True), key="mirror")
     col_o4, col_o5, col_o6 = st.columns(3)
     with col_o4: show_sub = st.checkbox("💬 Subtitle", value=True, key="show_sub")
