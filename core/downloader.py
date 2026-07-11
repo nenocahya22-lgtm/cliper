@@ -47,7 +47,32 @@ def _load_cookies(platform: str) -> list:
         try:
             import json
             with open(cfile) as f:
-                return json.load(f)
+                cookies = json.load(f)
+            if not isinstance(cookies, list):
+                return []
+            
+            # Filter cookies to prevent HTTP 413: Request Entity Too Large
+            essential_keys = {
+                # YouTube essential auth & download cookies
+                "SID", "HSID", "SSID", "APISID", "SAPISID", "LOGIN_INFO", "PREF", "YSC",
+                "__Secure-1PAPISID", "__Secure-1PSID", "__Secure-3PAPISID", "__Secure-3PSID",
+                "__Secure-3PSIDTS", "__Secure-3PSIDCC", "__Secure-1PSIDTS", "__Secure-1PSIDCC",
+                "VISITOR_INFO1_LIVE", "VISITOR_PRIVACY_METADATA", "GPS",
+                # TikTok essential auth cookies
+                "sessionid", "sessionid_ss", "sid_tt", "uid_tt", "uid_tt_ss", "tt_webid", "tt_webid_v2", "odin_tt", "msToken",
+                # Facebook essential auth cookies
+                "c_user", "xs", "fr", "datr", "sb", "spin", "wd"
+            }
+            
+            filtered = []
+            for c in cookies:
+                name = c.get("name", "")
+                # Only keep essential cookies or cookies with small values
+                if name in essential_keys:
+                    filtered.append(c)
+                elif len(c.get("value", "")) < 120:  # Keep other small utility/session cookies
+                    filtered.append(c)
+            return filtered
         except:
             pass
     return []
@@ -128,6 +153,15 @@ def _default_opts(url: str = "", **extra):
         "max_sleep_interval": 15,
         "sleep_requests": 2,  # jeda antar request API biar gak kena rate limit
     }
+
+    # Auto-fetch cookies from local browser if configured
+    try:
+        import streamlit as st
+        browser = st.session_state.get("local_browser_cookies", "None")
+        if browser and browser != "None":
+            opts["cookiesfrombrowser"] = (browser,)
+    except Exception:
+        pass
 
     # Attach cookies if available for this platform
     cookies = _load_cookies(platform)
@@ -562,6 +596,17 @@ class VideoDownloader:
                     os.replace(temp_wav, raw_wav)
                 else:
                     print(f"[download_audio] Gagal normalize WAV: {r.stderr[:200]}")
+            # Trim WAV ke max_dur jika durasi asli melebihi batas
+            if limit < dur and limit > 0:
+                trimmed_wav = raw_wav + ".trimmed.wav"
+                r = subprocess.run([FFMPEG_PATH, "-y", "-ss", "0", "-t", str(limit), "-i", raw_wav, "-ac", "1", "-ar", "16000", trimmed_wav],
+                    capture_output=True, text=True, timeout=120)
+                if Path(trimmed_wav).exists():
+                    os.replace(trimmed_wav, raw_wav)
+                    dur = limit
+                    print(f"[download_audio] Audio di-trim ke {limit:.0f}s (dari {dur:.0f}s)")
+                else:
+                    print(f"[download_audio] Gagal trim audio: {r.stderr[:100]}")
             _cleanup_cookie_files()
             return (raw_wav, title, dur)
         _cleanup_cookie_files()

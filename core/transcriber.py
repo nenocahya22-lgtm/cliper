@@ -1,7 +1,13 @@
-import time
+import time, subprocess
 from pathlib import Path
 from typing import Tuple, List
 from dataclasses import dataclass, field
+
+# Try to get FFMPEG_PATH for GPU detection
+FFMPEG_PATH = "ffmpeg"
+import shutil
+_s = shutil.which("ffmpeg") or shutil.which("ffmpeg.exe")
+if _s: FFMPEG_PATH = _s
 
 WHISPER_MODEL_SIZE = "tiny"
 
@@ -11,12 +17,52 @@ class WordTimestamp:
 
 class AudioTranscriber:
     _model = None
+    _gpu_available = None
+
+    @classmethod
+    def check_gpu(cls) -> dict:
+        """Check if GPU (CUDA) is available for acceleration."""
+        if cls._gpu_available is not None:
+            return cls._gpu_available
+
+        result = {"cuda": False, "nvenc": False, "device": "cpu", "compute_type": "int8"}
+
+        # Check CUDA via nvidia-smi
+        try:
+            r = subprocess.run(["nvidia-smi", "--query-gpu=name,memory.total,driver_version",
+                "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=5)
+            if r.returncode == 0 and r.stdout.strip():
+                parts = r.stdout.strip().split(",")
+                result["cuda"] = True
+                result["device"] = "cuda"
+                result["compute_type"] = "float16"
+                if len(parts) >= 1:
+                    result["gpu_name"] = parts[0].strip()
+                if len(parts) >= 2:
+                    result["vram_mb"] = parts[1].strip()
+        except:
+            pass
+
+        # Check NVENC via ffmpeg
+        try:
+            r = subprocess.run([FFMPEG_PATH, "-encoders"], capture_output=True, text=True, timeout=5)
+            if "h264_nvenc" in r.stdout:
+                result["nvenc"] = True
+        except:
+            pass
+
+        cls._gpu_available = result
+        return result
 
     @classmethod
     def _get_model(cls):
         if cls._model is None:
             from faster_whisper import WhisperModel
-            cls._model = WhisperModel(WHISPER_MODEL_SIZE, device="cpu", compute_type="int8")
+            gpu = cls.check_gpu()
+            device = gpu["device"]
+            compute = gpu["compute_type"]
+            print(f"[Whisper] GPU: {gpu['cuda']} | Device: {device} | Compute: {compute}")
+            cls._model = WhisperModel(WHISPER_MODEL_SIZE, device=device, compute_type=compute)
         return cls._model
 
     @staticmethod

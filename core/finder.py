@@ -1,3 +1,4 @@
+import re
 from typing import List, Tuple
 from dataclasses import dataclass, field
 
@@ -72,6 +73,52 @@ class ViralMomentFinder:
         "kontroversial","debatable","unik","langka","rare","exclusive","rahasia umum"
     }
 
+    # ── Weighted scoring weights ──────────────────────────────────
+    # Bobot untuk setiap aspek viral
+    WEIGHT_KEYWORD_MATCH = 2.0    # Per kata kunci HOOK/CLIMAX/CTA yang cocok
+    WEIGHT_EMOTIONAL = 2.5        # Per kata emosional yang cocok
+    WEIGHT_WORD_DENSITY = 1.5     # Kerapatan kata (bicara cepat = intens)
+    WEIGHT_QUESTION = 2.0         # Kalimat tanya = engagement
+    WEIGHT_EXCLAMATION = 1.5      # Kalimat seru = emosi tinggi
+    WEIGHT_CONTROVERSIAL = 3.0    # Kata kontroversial = komentar
+    WEIGHT_NUMBERS = 1.0          # Angka/statistik = kredibel
+
+    @staticmethod
+    def _score_segment(text: str, word_count: int, part_dur: float) -> float:
+        """Hitung viral score untuk satu segmen teks."""
+        t = text.lower()
+        sc = 0.0
+
+        # Word density (bicara cepat = intens)
+        dens = word_count / max(part_dur, 1)
+        if dens > 3.0: sc += ViralMomentFinder.WEIGHT_WORD_DENSITY * 2
+        elif dens > 2.0: sc += ViralMomentFinder.WEIGHT_WORD_DENSITY
+        elif dens > 1.5: sc += ViralMomentFinder.WEIGHT_WORD_DENSITY * 0.5
+
+        # Keyword matches
+        for kw in ViralMomentFinder.HOOK_KW:
+            if kw.lower() in t: sc += ViralMomentFinder.WEIGHT_KEYWORD_MATCH
+        for kw in ViralMomentFinder.CLIMAX_KW:
+            if kw.lower() in t: sc += ViralMomentFinder.WEIGHT_KEYWORD_MATCH
+        for kw in ViralMomentFinder.CTA_KW:
+            if kw.lower() in t: sc += ViralMomentFinder.WEIGHT_KEYWORD_MATCH
+
+        # Emotional words
+        for ew in ViralMomentFinder.EMOTIONAL:
+            if ew.lower() in t: sc += ViralMomentFinder.WEIGHT_EMOTIONAL
+
+        # Punctuation indicators
+        questions = t.count("?")
+        exclamations = t.count("!")
+        sc += questions * ViralMomentFinder.WEIGHT_QUESTION
+        sc += exclamations * ViralMomentFinder.WEIGHT_EXCLAMATION
+
+        # Numbers/statistics
+        numbers = len(re.findall(r'\b\d+\b', t))
+        sc += numbers * ViralMomentFinder.WEIGHT_NUMBERS
+
+        return sc
+
     @staticmethod
     def find_moments(transcript: str, duration: float, word_ts: List[WordTimestamp],
                      use_llm: bool = False, model_name: str = None) -> List[ViralMoment]:
@@ -85,22 +132,21 @@ class ViralMomentFinder:
                 words = transcript.split()
                 for m in res:
                     m.transcript_snippet = " ".join(ViralMomentFinder._words_in_range(word_ts, words, duration, m.start_time, m.end_time))[:300]
-                # Sort by viral potential — use category priority if no viral_score
+                # Sort by viral_score descending
                 priority = {"HOOK": 10, "KLIMAKS": 8, "CTA": 6, "AUTO": 4}
                 res.sort(key=lambda x: -priority.get(x.category, 5))
                 return res
 
         if not transcript or duration <= 5:
-            # Fallback: kalau transkrip kosong tapi durasi panjang, buat beberapa segmen pendek
             if duration > 60:
                 num_segments = min(6, max(2, int(duration / 60)))
-                seg_width = 60  # tiap segmen maks 60 detik
+                seg_width = 60
                 spacing = duration / num_segments
                 segments = []
                 for i in range(num_segments):
                     s = i * spacing
                     e = min(s + seg_width, duration)
-                    segments.append(ViralMoment(s, e, f"Segmen {i+1}", "AUTO", transcript or ""))
+                    segments.append(ViralMoment(s, e, f"Segmen {i+1} — otomatis", "AUTO", transcript or ""))
                 return segments
             return [ViralMoment(0, min(duration,30), "Klip pendek", "KLIMAKS", transcript or "")]
         words = transcript.split()
@@ -113,51 +159,85 @@ class ViralMomentFinder:
                 for i in range(num_segments):
                     s = i * spacing
                     e = min(s + seg_width, duration)
-                    segments.append(ViralMoment(s, e, f"Segmen {i+1}", "AUTO", transcript))
+                    segments.append(ViralMoment(s, e, f"Segmen {i+1} — otomatis", "AUTO", transcript))
                 return segments
             return [ViralMoment(0, min(duration,30), "Video dengan sedikit teks", "KLIMAKS", transcript)]
 
-        num = min(8, max(3, int(duration/15)))
+        # ── Weighted scoring over segments ──
+        num = min(12, max(4, int(duration/10)))
         part_dur = duration / num
         scores = []
         for i in range(num):
             ps, pe = i*part_dur, (i+1)*part_dur
             pw = ViralMomentFinder._words_in_range(word_ts, words, duration, ps, pe)
-            pt = " ".join(pw).lower()
-            sc = 0
-            dens = len(pw) / max(part_dur, 1)
-            if dens > 2.0: sc += 3
-            elif dens > 1.0: sc += 1
-            for ew in ViralMomentFinder.EMOTIONAL:
-                if ew.lower() in pt: sc += 2
+            pt = " ".join(pw)
+            sc = ViralMomentFinder._score_segment(pt, len(pw), part_dur)
             scores.append({"start":ps,"end":pe,"score":sc,"text":pt[:200]})
 
-        first = " ".join(ViralMomentFinder._words_in_range(word_ts, words, duration, 0, duration*0.2)).lower()
+        # ── HOOK: cari di 20% pertama ──
+        first = " ".join(ViralMomentFinder._words_in_range(word_ts, words, duration, 0, duration*0.25)).lower()
         hr = "Pembukaan video"
+        hook_kw_found = []
         for kw in ViralMomentFinder.HOOK_KW:
-            if kw.lower() in first: hr = f"Hook: '{kw}'"; break
-        if scores and scores[0]["score"] >= 3: hr += " (intensitas tinggi)"
+            if kw.lower() in first:
+                hook_kw_found.append(kw)
+        if hook_kw_found:
+            hr = f"Hook: '{hook_kw_found[0]}'"
+        if scores and scores[0]["score"] >= 5:
+            hr += " ⭐ intensitas sangat tinggi"
+        elif scores and scores[0]["score"] >= 3:
+            hr += " 📈 intensitas tinggi"
         hook = ViralMoment(0.0, min(15.0, duration*0.2), hr, "HOOK", first[:200])
 
+        # ── KLIMAKS dari segmen dengan skor tertinggi ──
         mid = scores[1:-1] if len(scores)>2 else scores
         best = max(mid, key=lambda p: p["score"]) if mid else scores[len(scores)//2]
         mp = (best["start"]+best["end"])/2
         cs, ce = max(0,mp-15), min(duration,mp+15)
         cr = "Inti pembahasan"
+        clim_kw_found = []
         for kw in ViralMomentFinder.CLIMAX_KW:
-            if kw.lower() in best["text"]: cr = f"Klimaks: '{kw}'"; break
-        if best["score"] >= 5: cr += " (intensitas sangat tinggi)"
-        elif best["score"] >= 3: cr += " (intensitas tinggi)"
+            if kw.lower() in best["text"].lower():
+                clim_kw_found.append(kw)
+        if clim_kw_found:
+            cr = f"Klimaks: '{clim_kw_found[0]}'"
+        if best["score"] >= 8:
+            cr += " 🔥 sangat viral!"
+        elif best["score"] >= 5:
+            cr += " ⭐ intensitas sangat tinggi"
+        elif best["score"] >= 3:
+            cr += " 📈 intensitas tinggi"
+        else:
+            cr += " ⚡ potensi viral"
         csnip = " ".join(ViralMomentFinder._words_in_range(word_ts, words, duration, cs, ce))[:300]
         climax = ViralMoment(cs, ce, cr, "KLIMAKS", csnip)
 
+        # ── CTA: cari di 25% akhir ──
         cta_t = duration * 0.75
         cta_text = " ".join(ViralMomentFinder._words_in_range(word_ts, words, duration, cta_t, duration)).lower()
         cta_r = "Bagian akhir video"
+        cta_kw_found = []
         for kw in ViralMomentFinder.CTA_KW:
-            if kw.lower() in cta_text: cta_r = f"CTA: '{kw}'"; break
+            if kw.lower() in cta_text:
+                cta_kw_found.append(kw)
+        if cta_kw_found:
+            cta_r = f"CTA: '{cta_kw_found[0]}'"
+        # Skor CTA
+        cta_score = ViralMomentFinder._score_segment(cta_text, len(cta_text.split()), duration*0.25)
+        if cta_score >= 5:
+            cta_r += " 🎯 CTA kuat!"
         cta = ViralMoment(cta_t, duration, cta_r, "CTA", cta_text[:200])
-        return [hook, climax, cta]
+
+        # ── CONTROVERSIAL: cari segmen dengan skor tinggi di luar HOOK/CTA ──
+        bonus_segments = []
+        for s in scores:
+            if s["score"] >= 5 and s["start"] > duration*0.2 and s["end"] < duration*0.75:
+                bonus_segments.append(ViralMoment(s["start"], s["end"],
+                    f"Momen viral ⚡ skor {s['score']:.0f}", "AUTO", s["text"][:200]))
+
+        result = [hook, climax, cta]
+        result.extend(bonus_segments[:2])  # max 2 bonus segments
+        return result
 
     @staticmethod
     def _words_in_range(word_ts, all_words, duration, start, end):

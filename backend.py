@@ -66,6 +66,11 @@ class RenderRequest(BaseModel):
     sub_align: int = 5
     sub_upper: bool = True
     auto_post: bool = False
+    remove_silence: bool = False
+    silence_noise_thresh: str = "-30dB"
+    silence_min_dur: float = 0.5
+    jump_cut: bool = False
+    jump_cut_thresh: float = 0.15
 
 @app.get("/api/health")
 def health():
@@ -87,7 +92,10 @@ def _process_job(job_id: str, url: str, wd: str, moment_mode: str, model_name: s
         res.title = title
         res.duration = dur
 
-        audio, _, _ = VideoDownloader.download_audio(url, wd, max_dur=600)
+        # max_dur: durasi asli video, capped 1800s (30 menit) untuk hindari timeout
+        # Untuk video >30 menit, tool transkripsi 30 menit pertama yg paling padat konten
+        max_audio = min(dur or 1800, 1800)
+        audio, _, _ = VideoDownloader.download_audio(url, wd, max_dur=max_audio)
         if audio and Path(audio).exists():
             res.audio_path = audio
             text, wts = AudioTranscriber.transcribe(audio)
@@ -217,7 +225,12 @@ def render_clip(req: RenderRequest):
             aspect=req.aspect,
             contrast=req.contrast, brightness=req.brightness, saturation=req.saturation,
             vignette=req.vignette, sepia=req.sepia, grayscale=req.grayscale,
-            sharpen=req.sharpen, edge_detect=req.edge_detect
+            sharpen=req.sharpen, edge_detect=req.edge_detect,
+            remove_silence=req.remove_silence,
+            silence_noise_thresh=req.silence_noise_thresh,
+            silence_min_dur=req.silence_min_dur,
+            jump_cut=req.jump_cut,
+            jump_cut_thresh=req.jump_cut_thresh
         )
         if not ok:
             raise Exception(err)
@@ -447,11 +460,73 @@ def upload_clip(req: UploadRequest):
         clip_id = Path(clip_path).stem
         db.clip_update_upload_status(clip_id, req.platform, "done")
         db.stats_increment_today()
-        # Auto-cleanup
-        db.clips_cleanup_uploaded()
+        # HAPUS file segera setelah upload berhasil (sekali pakai)
+        try:
+            Path(clip_path).unlink(missing_ok=True)
+            print(f"[CLEANUP] File dihapus setelah upload: {clip_path}")
+            # Hapus juga file JSON metadata jika ada
+            meta = clip_path + ".json"
+            if Path(meta).exists():
+                Path(meta).unlink(missing_ok=True)
+        except Exception as cleanup_e:
+            print(f"[CLEANUP] Gagal hapus file: {cleanup_e}")
         return {"status": "uploaded"}
     except Exception as e:
         raise HTTPException(500, str(e))
+
+# ── Brand Templates ───────────────────────────────────────────────
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+os.makedirs(TEMPLATES_DIR, exist_ok=True)
+
+@app.get("/api/templates")
+def list_templates():
+    templates = []
+    for f in sorted(Path(TEMPLATES_DIR).glob("*.json"), key=os.path.getmtime, reverse=True):
+        try:
+            with open(f) as fp:
+                data = json.load(fp)
+            data["name"] = f.stem
+            templates.append(data)
+        except:
+            pass
+    return templates
+
+class BrandTemplate(BaseModel):
+    name: str
+    subtitle_font: str = "Montserrat"
+    subtitle_size: int = 44
+    subtitle_color: str = "Kuning"
+    subtitle_align: int = 5
+    subtitle_upper: bool = True
+    color_preset: str = "none"
+    aspect: str = "Portrait 9:16 (Shorts/TikTok)"
+    contrast: float = 1.0
+    brightness: float = 0.0
+    saturation: float = 1.0
+    remove_silence: bool = True
+    watermark_text: str = ""
+
+@app.post("/api/templates")
+def save_template(req: BrandTemplate):
+    safe_name = "".join(c if c.isalnum() or c in " _-" else "_" for c in req.name)[:30]
+    path = os.path.join(TEMPLATES_DIR, f"{safe_name}.json")
+    with open(path, "w") as f:
+        json.dump(req.model_dump(), f, indent=2)
+    return {"status": "saved", "name": safe_name}
+
+@app.delete("/api/templates/{name}")
+def delete_template(name: str):
+    path = os.path.join(TEMPLATES_DIR, f"{name}.json")
+    if Path(path).exists():
+        Path(path).unlink()
+    return {"status": "deleted"}
+
+# ── GPU Status ──────────────────────────────────────────────────────
+@app.get("/api/gpu")
+def get_gpu_status():
+    from core.transcriber import AudioTranscriber
+    return AudioTranscriber.check_gpu()
+
 
 from fastapi.responses import RedirectResponse
 

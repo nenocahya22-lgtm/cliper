@@ -35,7 +35,8 @@ server.log
 *.log
 
 # Streamlit
-.streamlit/
+.streamlit/secrets.toml
+.streamlit/*.local
 
 # OS
 Thumbs.db
@@ -50,6 +51,12 @@ accounts/**/*.json
 # Output videos & temp files
 output/
 !output/.gitkeep
+
+# Test files (too large for GitHub)
+test_*.wav
+test_*.mp4
+all_proxies_raw.txt
+nul
 
 # Environment files
 .env

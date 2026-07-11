@@ -7,7 +7,7 @@ import os, time, uuid, subprocess, shutil, threading, json
 from pathlib import Path
 import streamlit as st
 
-from core.downloader import VideoDownloader, _default_opts, ProxyRotator, _load_proxies
+from core.downloader import VideoDownloader, _default_opts, ProxyRotator, _load_proxies, FFMPEG_PATH
 from core.transcriber import AudioTranscriber, WordTimestamp
 from core.finder import ViralMomentFinder, ProcessingResult
 from core.editor import SubtitleGenerator, VideoProcessor, SUBTITLE_COLORS, ASPECT_PRESETS, TRANSITIONS
@@ -41,75 +41,50 @@ PAGE_IDS = [p[0] for p in PAGES]
 def _get_cached_css():
     return """
 <style>
-/* ══════════════════════════════════════════════════════════
-   NINTENDO.COM (2001) — DESIGN SYSTEM
-   Beveled periwinkle chrome · Carbon command layer ·
-   Rationed warm wayfinding · Chamfered corners · Arial/Helvetica only
-   ══════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap');
 
 :root {
   /* ── Brand & Accent ────────────────────────────── */
-  --nintendo-red:      #e60012;
-  --signal:            #f68d1f;
-  --amber:             #ecab37;
-  --nav-gold:          #e48600;
+  --nintendo-red:      #ff4a5a;
+  --signal:            #8b5cf6; /* Violet */
+  --nav-gold:          #a78bfa;
 
   /* ── Surface / Chrome ──────────────────────────── */
-  --canvas:            #7a8aba;
-  --periwinkle:        #8ba1d4;
-  --sky:               #9fbee7;
-  --lavender:          #acace7;
-  --ice:               #c0d5e6;
-  --chrome-indigo:     #3d4f97;
-  --muted-indigo:      #60619c;
-  --platinum:          #dedede;
-  --surface:           #ffffff;
-  --carbon:            #21242e;
-  --carbon-soft:       #2a2e3a;
+  --canvas:            #08090d;
+  --muted-indigo:      #94a3b8;
+  --surface:           #10111a;
+  --carbon:            #0b0c10;
+  --carbon-soft:       #151622;
 
   /* ── Text ──────────────────────────────────────── */
-  --ink:               #21242e;
-  --ink-soft:          #3d4f97;
+  --ink:               #f8fafc;
+  --ink-soft:          #94a3b8;
   --on-primary:        #ffffff;
-  --on-carbon:         #c0d5e6;
+  --on-carbon:         #cbd5e1;
 
   /* ── Semantic ──────────────────────────────────── */
-  --error:             #e60012;
-  --systems-teal:      #206479;
-  --games-red:         #a7282b;
 
   /* ── Spacing ───────────────────────────────────── */
   --sp-xxs: 2px;  --sp-xs: 4px;  --sp-sm: 8px;
   --sp-md: 12px;  --sp-lg: 16px; --sp-xl: 24px; --sp-xxl: 32px;
 
   /* ── Radii ─────────────────────────────────────── */
-  --r-none: 0px;    --r-xs: 2px;  --r-sm: 4px;
-  --r-md: 6px;      --r-lg: 10px; --r-full: 9999px;
+  --r-none: 0px;    --r-xs: 4px;  --r-sm: 8px;
+  --r-md: 12px;     --r-lg: 16px; --r-full: 9999px;
 
-  --sidebar-width: 220px;
-  --content-max: 800px;
-
-  /* ── Chamfer cut size ──────────────────────────── */
-  --chamfer: 4px;
-
-  /* ── Sidebar toggle state ────────────────────── */
-  --sidebar-left: 0px;
-}
-
-/* ── Chamfered corner mixin ─────────────────────────────── */
-.chamfer {
-  clip-path: polygon(var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%, 0 var(--chamfer));
+  --sidebar-width: 250px;
+  --content-max: 840px;
 }
 
 /* ── Base Reset ─────────────────────────────────────────── */
 * { box-sizing: border-box; }
 html, body, [data-testid="stApp"], .stApp {
   background: var(--canvas) !important;
-  font-family: Arial, Helvetica, sans-serif !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
   color: var(--ink) !important;
 }
 
-/* ── Streamlit header toggle ────────────────────────────── */
+/* Hide standard Streamlit header/menus */
 [data-testid="stToolbar"] { display: none; }
 [data-testid="stDecoration"] { display: none; }
 #MainMenu { visibility: hidden; }
@@ -118,19 +93,15 @@ header { display: none !important; }
 .appview-container .main .block-container { padding: 0 !important; max-width: none !important; }
 
 /* ══════════════════════════════════════════════════════════
-   SIDEBAR — Carbon Navy Command Slab with Halftone
+   SIDEBAR — Cyber Dark Pane
    ══════════════════════════════════════════════════════════ */
 [data-testid="stSidebar"] {
   background: var(--carbon) !important;
-  border: none !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
   padding: 0 !important;
   min-width: var(--sidebar-width) !important;
   max-width: var(--sidebar-width) !important;
   position: relative;
-  background-image:
-    radial-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(var(--carbon), var(--carbon)) !important;
-  background-size: 4px 4px, 100% 100% !important;
 }
 
 [data-testid="stSidebar"] > div:first-child {
@@ -143,131 +114,135 @@ header { display: none !important; }
 
 [data-testid="stSidebar"] > div:first-child::-webkit-scrollbar { width: 0; }
 
-/* Logo — Nintendo racetrack-pill style */
 .sidebar-logo {
   display: flex;
   align-items: center;
   gap: var(--sp-md);
   padding: 0 var(--sp-sm) var(--sp-xl) var(--sp-sm);
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   margin-bottom: var(--sp-lg);
 }
 .sidebar-logo-icon {
-  width: 34px; height: 34px;
-  background: var(--nintendo-red);
-  border-radius: var(--r-full);
+  width: 36px; height: 36px;
+  background: linear-gradient(135deg, #7c3aed, #db2777);
+  border-radius: 10px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 18px; flex-shrink: 0;
-  border: 2px solid var(--surface);
-  box-shadow: inset 0 -2px 0 rgba(0,0,0,0.2), 0 0 0 1px var(--chrome-indigo);
+  font-size: 20px; flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
 }
 .sidebar-logo-text {
-  font-weight: 700; font-size: 16px;
-  letter-spacing: 0.5px;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700; font-size: 18px;
+  letter-spacing: -0.2px;
   color: var(--surface);
+  background: linear-gradient(to right, #a78bfa, #f472b6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
   line-height: 1.2;
-  text-transform: uppercase;
 }
 .sidebar-logo-sub {
-  font-size: 9px; color: var(--on-carbon);
-  letter-spacing: 1px; text-transform: uppercase;
+  font-size: 10px; color: var(--on-carbon);
+  letter-spacing: 0.5px;
+  font-weight: 500;
 }
 
-/* Sidebar nav buttons — Nav Gold on carbon */
+/* Sidebar Nav Buttons */
 [data-testid="stSidebar"] .stButton > button {
   justify-content: flex-start !important;
-  font-size: 13px !important;
-  font-family: Arial, Helvetica, sans-serif !important;
-  font-weight: 700 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.5px !important;
-  padding: 10px 14px !important;
-  margin-bottom: 2px !important;
-  clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px) !important;
+  font-size: 14px !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  letter-spacing: 0px !important;
+  padding: 12px 16px !important;
+  margin-bottom: var(--sp-xs) !important;
+  border-radius: 12px !important;
   background: transparent !important;
   border: none !important;
   color: var(--on-carbon) !important;
   box-shadow: none !important;
-  transition: all 0.15s !important;
+  transition: all 0.2s ease !important;
+  clip-path: none !important;
 }
 [data-testid="stSidebar"] .stButton > button:hover {
-  background: rgba(255,255,255,0.06) !important;
-  color: var(--surface) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  color: var(--ink) !important;
+  transform: translateX(4px);
 }
 [data-testid="stSidebar"] .stButton > button[kind="primary"] {
-  background: rgba(228,134,0,0.15) !important;
+  background: rgba(124, 58, 237, 0.1) !important;
   color: var(--nav-gold) !important;
-  box-shadow: inset 2px 0 0 var(--nav-gold) !important;
+  box-shadow: none !important;
+  border-left: 3px solid #7c3aed !important;
+  border-radius: 0 12px 12px 0 !important;
 }
 
-/* Sidebar accounts */
+/* Sidebar accounts list */
 .sidebar-accounts {
   margin-top: auto;
   padding-top: var(--sp-lg);
-  border-top: 1px solid rgba(255,255,255,0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 .sidebar-account-row {
   display: flex; align-items: center; gap: var(--sp-sm);
-  padding: 6px 8px; font-size: 11px;
-  font-family: Arial, Helvetica, sans-serif;
+  padding: 8px 10px; font-size: 13px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   color: var(--on-carbon);
-  letter-spacing: 0.3px;
 }
 .sidebar-account-dot {
   width: 8px; height: 8px; border-radius: var(--r-full);
   flex-shrink: 0;
-  box-shadow: inset 0 -1px 0 rgba(0,0,0,0.3);
+  box-shadow: 0 0 6px currentColor;
 }
 .sidebar-footer {
   margin-top: var(--sp-lg); padding: var(--sp-md) var(--sp-sm) 0;
-  border-top: 1px solid rgba(255,255,255,0.08);
-  font-size: 9px; color: var(--on-carbon);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  font-size: 11px; color: var(--ink-soft);
   line-height: 1.5;
-  font-family: Arial, Helvetica, sans-serif;
-  letter-spacing: 0.3px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
 }
 
-/* Sidebar model select */
-.sidebar-model { margin: var(--sp-md) 0 var(--sp-sm) var(--sp-sm); }
+/* Sidebar Model Selector */
+.sidebar-model { margin: var(--sp-lg) 0 var(--sp-xs) var(--sp-sm); }
 .sidebar-model label {
-  font-size: 10px; font-weight: 700;
-  color: var(--on-carbon);
+  font-size: 11px; font-weight: 600;
+  color: var(--ink-soft);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  display: block; margin-bottom: 4px;
+  display: block; margin-bottom: 6px;
 }
 .sidebar-model select {
-  font-size: 12px; padding: 4px 8px;
+  font-size: 13px; padding: 8px 12px;
   background: var(--carbon-soft);
-  color: var(--surface);
-  border: 1px solid rgba(255,255,255,0.1);
-  clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px);
+  color: var(--ink);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
   width: 100%;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  clip-path: none !important;
 }
 
-/* User badge in sidebar */
+/* User Profile Badge */
 .sidebar-user-badge {
   display: flex; align-items: center; gap: var(--sp-sm);
   padding: var(--sp-md) var(--sp-sm);
-  border-top: 1px solid rgba(255,255,255,0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 .sidebar-user-avatar {
-  width: 26px; height: 26px; border-radius: var(--r-full);
-  background: rgba(228,134,0,0.2);
+  width: 32px; height: 32px; border-radius: var(--r-full);
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.2), rgba(219, 39, 119, 0.2));
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; color: var(--nav-gold);
+  font-size: 13px; color: var(--nav-gold);
   font-weight: 700; flex-shrink: 0;
-  border: 1px solid rgba(228,134,0,0.3);
+  border: 1px solid rgba(124, 58, 237, 0.3);
 }
 .sidebar-user-name {
-  font-size: 11px; color: var(--surface);
+  font-size: 13px; color: var(--ink);
   font-weight: 600;
-  letter-spacing: 0.3px;
 }
 
 /* ══════════════════════════════════════════════════════════
-   MAIN CONTENT — Periwinkle Chrome Canvas
+   MAIN CONTENT AREA
    ══════════════════════════════════════════════════════════ */
 .main-container {
   max-width: var(--content-max);
@@ -277,537 +252,452 @@ header { display: none !important; }
 }
 
 .page-header {
-  font-size: 28px;
-  font-weight: 900;
-  letter-spacing: -0.3px;
-  color: var(--carbon);
-  margin: 0 0 2px 0;
-  line-height: 1.1;
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-text-stroke: 1px var(--surface);
-  text-shadow: 2px 2px 0 rgba(0,0,0,0.15);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: #fff;
+  margin: 0 0 6px 0;
+  line-height: 1.2;
+  background: linear-gradient(to right, #fff, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none;
+  -webkit-text-stroke: 0px !important;
 }
 .page-sub {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--ink-soft);
   margin: 0 0 var(--sp-xl) 0;
-  line-height: 1.4;
-  font-family: Arial, Helvetica, sans-serif;
+  line-height: 1.5;
+  font-family: 'Plus Jakarta Sans', sans-serif;
 }
 
 /* ══════════════════════════════════════════════════════════
-   DASHBOARD GRID — Chamfered Beveled Stat Cards
+   DASHBOARD STATS & LAYOUT
    ══════════════════════════════════════════════════════════ */
 .dash-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: var(--sp-md);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sp-lg);
   margin-bottom: var(--sp-xl);
 }
 .dash-card {
-  background: var(--periwinkle);
-  clip-path: polygon(var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%, 0 var(--chamfer));
-  padding: var(--sp-lg);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: var(--sp-xl);
   text-align: center;
   position: relative;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.3),
-    inset 0 -1px 0 var(--chrome-indigo),
-    0 1px 2px rgba(0,0,0,0.1);
-  transition: all 0.15s;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(8px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  clip-path: none !important;
 }
 .dash-card:hover {
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.4),
-    inset 0 -2px 0 var(--chrome-indigo),
-    0 2px 6px rgba(0,0,0,0.15);
+  transform: translateY(-4px);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(139, 92, 246, 0.3);
+  box-shadow: 0 12px 40px 0 rgba(139, 92, 246, 0.15);
 }
 .dash-num {
-  font-size: 32px; font-weight: 900;
-  color: var(--carbon);
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 36px; font-weight: 700;
+  color: #fff;
   margin: 0; line-height: 1;
-  font-family: Arial, Helvetica, sans-serif;
 }
-.dash-num-dark { color: var(--carbon); }
+.dash-num-dark { color: #fff; }
 .dash-label {
-  font-size: 10px; color: var(--ink-soft);
-  margin: 6px 0 0 0;
-  font-weight: 700;
+  font-size: 11px; color: var(--ink-soft);
+  margin: 8px 0 0 0;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-family: Arial, Helvetica, sans-serif;
+  letter-spacing: 0.8px;
 }
 .dash-icon {
-  font-size: 22px; margin-bottom: var(--sp-sm);
-}
-
-/* Quick actions */
-.quick-actions-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--sp-md);
-  margin-bottom: var(--sp-lg);
+  font-size: 26px; margin-bottom: var(--sp-xs);
+  filter: drop-shadow(0 0 8px currentColor);
 }
 
 /* ══════════════════════════════════════════════════════════
-   BUTTONS — Chamfered Signal Orange & Chrome
+   BUTTONS — Glowing Gradient Look
    ══════════════════════════════════════════════════════════ */
 .stButton > button {
-  font-family: Arial, Helvetica, sans-serif !important;
-  font-weight: 700 !important;
-  font-size: 11px !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.5px !important;
-  padding: 8px 16px !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  text-transform: none !important;
+  letter-spacing: 0px !important;
+  padding: 10px 20px !important;
+  border-radius: 12px !important;
   border: none !important;
-  transition: all 0.15s !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
   cursor: pointer !important;
   line-height: 1.4 !important;
-  clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px) !important;
+  clip-path: none !important;
 }
 .stButton > button[kind="primary"] {
-  background: var(--signal) !important;
-  color: var(--surface) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.3),
-    inset 0 -1px 0 rgba(0,0,0,0.2),
-    0 1px 2px rgba(0,0,0,0.1) !important;
+  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%) !important;
+  color: var(--on-primary) !important;
+  box-shadow: 0 4px 15px rgba(124, 58, 237, 0.35) !important;
 }
 .stButton > button[kind="primary"]:hover {
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.4),
-    inset 0 -1px 0 rgba(0,0,0,0.3),
-    0 2px 6px rgba(0,0,0,0.2) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.5) !important;
 }
 .stButton > button[kind="primary"]:active {
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.2) !important;
+  transform: translateY(1px);
 }
 .stButton > button[kind="secondary"] {
-  background: var(--surface) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
   color: var(--ink) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.5),
-    inset 0 -1px 0 var(--chrome-indigo),
-    0 1px 2px rgba(0,0,0,0.08) !important;
-  border: 1px solid var(--chrome-indigo) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
 }
 .stButton > button[kind="secondary"]:hover {
-  border-color: var(--signal) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.5),
-    inset 0 -1px 0 var(--chrome-indigo),
-    0 2px 6px rgba(0,0,0,0.12) !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(139, 92, 246, 0.4) !important;
+  transform: translateY(-1px);
 }
 
 /* ══════════════════════════════════════════════════════════
-   CARDS — Chamfered Beveled Periwinkle Plates
+   CARDS & MEMENT PANELS
    ══════════════════════════════════════════════════════════ */
 .card, .queue-card, .moment-card {
-  background: var(--periwinkle);
-  clip-path: polygon(var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%, 0 var(--chamfer));
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
   padding: var(--sp-lg);
   margin-bottom: var(--sp-md);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.3),
-    inset 0 -1px 0 var(--chrome-indigo),
-    0 1px 2px rgba(0,0,0,0.06);
-  transition: all 0.15s;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+  clip-path: none !important;
 }
 .card:hover, .queue-card:hover, .moment-card:hover {
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.4),
-    inset 0 -2px 0 var(--chrome-indigo),
-    0 2px 6px rgba(0,0,0,0.1);
+  border-color: rgba(139, 92, 246, 0.25);
+  background: rgba(255, 255, 255, 0.03);
+  transform: translateY(-2px);
 }
-.card-flat { box-shadow: none !important; }
+.card-flat { box-shadow: none !important; border-color: transparent !important; background: transparent !important; }
 
 /* ══════════════════════════════════════════════════════════
-   STEP BAR — Chamfered Workflow Indicator
+   WORKFLOW STEPS BAR
    ══════════════════════════════════════════════════════════ */
 .step-bar {
-  display: flex; align-items: center; gap: var(--sp-sm);
+  display: flex; align-items: center; justify-content: space-between;
   margin-bottom: var(--sp-xl);
-  padding: var(--sp-lg);
-  background: var(--periwinkle);
-  clip-path: polygon(var(--chamfer) 0, 100% 0, 100% calc(100% - var(--chamfer)), calc(100% - var(--chamfer)) 100%, 0 100%, 0 var(--chamfer));
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.3),
-    inset 0 -1px 0 var(--chrome-indigo);
+  padding: var(--sp-lg) var(--sp-xl);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  clip-path: none !important;
 }
 .step-item {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 11px; color: var(--muted-indigo);
-  font-family: Arial, Helvetica, sans-serif;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  transition: color 0.15s;
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--ink-soft);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0px;
 }
-.step-item.active { color: var(--carbon); }
+.step-item.active { color: #fff; font-weight: 700; }
 .step-item.done { color: var(--nav-gold); }
 .step-dot {
-  width: 6px; height: 6px; border-radius: var(--r-full);
-  background: var(--muted-indigo); flex-shrink: 0;
-  transition: background 0.15s;
+  width: 8px; height: 8px; border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.15); flex-shrink: 0;
+  box-shadow: 0 0 0 2px transparent;
+  transition: all 0.2s ease;
 }
-.step-item.active .step-dot { background: var(--signal); }
+.step-item.active .step-dot { background: #8b5cf6; box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3), 0 0 10px #8b5cf6; }
 .step-item.done .step-dot { background: var(--nav-gold); }
 .step-line {
-  width: 16px; height: 1px;
-  background: var(--chrome-indigo);
+  flex-grow: 1; height: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  margin: 0 16px;
   flex-shrink: 0;
 }
 
 /* ══════════════════════════════════════════════════════════
-   DOTTED DIVIDER — Chrome Indigo dotted rule
-   ══════════════════════════════════════════════════════════ */
-.dotted-divider {
-  border: none;
-  border-top: 1px dotted var(--muted-indigo);
-  margin: var(--sp-md) 0;
-}
-
-/* ══════════════════════════════════════════════════════════
-   TABS — Chrome Indigo Tabs
+   TABS — Flat Underlined
    ══════════════════════════════════════════════════════════ */
 .stTabs [data-baseweb="tab-list"] {
-  border-bottom: 1px solid var(--chrome-indigo);
-  gap: 0;
-  background: var(--periwinkle);
-  clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
-  padding: 0 4px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  gap: 8px;
+  background: transparent;
+  padding: 0;
+  box-shadow: none;
+  clip-path: none !important;
 }
 .stTabs [data-baseweb="tab"] {
-  font-family: Arial, Helvetica, sans-serif;
-  font-weight: 700;
-  font-size: 11px;
-  color: var(--muted-indigo);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  padding: 10px 14px;
-  transition: color 0.15s;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink-soft);
+  text-transform: none;
+  letter-spacing: 0px;
+  padding: 12px 18px;
+  border-radius: 8px 8px 0 0;
+  transition: all 0.2s ease;
 }
-.stTabs [aria-selected="true"] { color: var(--nav-gold) !important; }
+.stTabs [aria-selected="true"] {
+  color: #8b5cf6 !important;
+  background: rgba(139, 92, 246, 0.05) !important;
+  border-bottom: 2px solid #8b5cf6 !important;
+}
 
 /* ══════════════════════════════════════════════════════════
-   INPUTS — White Inset Fields
+   INPUTS & TEXT FIELDS
    ══════════════════════════════════════════════════════════ */
 .stTextInput > div > div > input,
 .stTextArea > div > div > textarea,
 .stSelectbox > div > div > select,
 .stNumberInput > div > div > input {
-  clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px) !important;
-  border: 1px solid var(--chrome-indigo) !important;
-  font-family: Arial, Helvetica, sans-serif !important;
-  font-size: 12px !important;
-  color: var(--ink) !important;
-  background: var(--surface) !important;
-  box-shadow:
-    inset 0 1px 2px rgba(0,0,0,0.06),
-    inset 0 -1px 0 rgba(255,255,255,0.5) !important;
+  clip-path: none !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-size: 14px !important;
+  color: #fff !important;
+  background: #111219 !important;
+  box-shadow: none !important;
+  padding: 10px 14px !important;
+  transition: all 0.2s ease !important;
 }
 .stTextInput > div > div > input:focus,
 .stTextArea > div > div > textarea:focus {
-  border-color: var(--signal) !important;
-  box-shadow:
-    inset 0 1px 2px rgba(0,0,0,0.06),
-    0 0 0 2px rgba(246,141,31,0.15) !important;
+  border-color: #8b5cf6 !important;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.25) !important;
 }
 
-/* Checkboxes */
-.stCheckbox label {
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 12px;
-  color: var(--ink);
+.stCheckbox label, .stRadio label {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 13px;
+  color: var(--on-carbon);
 }
-.stCheckbox [data-baseweb="checkbox"] {
-  border-color: var(--chrome-indigo) !important;
+.stCheckbox [data-baseweb="checkbox"], .stRadio [data-baseweb="radio"] {
+  border-color: rgba(255, 255, 255, 0.2) !important;
 }
-.stCheckbox [data-baseweb="checkbox"][aria-checked="true"] {
-  background: var(--signal) !important;
-  border-color: var(--signal) !important;
-}
-
-/* Radio */
-.stRadio label {
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 12px;
-}
-.stRadio [data-baseweb="radio"] {
-  border-color: var(--chrome-indigo) !important;
-}
+.stCheckbox [data-baseweb="checkbox"][aria-checked="true"],
 .stRadio [data-baseweb="radio"][aria-checked="true"] {
-  background: var(--signal) !important;
-  border-color: var(--signal) !important;
+  background: #8b5cf6 !important;
+  border-color: #8b5cf6 !important;
 }
 
-/* Sliders */
-.stSlider label {
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+.stSlider label, .stSelectbox label, .stMultiSelect label, .stNumberInput label, .stFileUploader label {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0px;
   color: var(--ink-soft);
+  margin-bottom: 6px;
 }
 .stSlider [data-baseweb="slider"] div {
-  background: var(--chrome-indigo) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
 }
 .stSlider [data-baseweb="slider"] div[role="slider"] {
-  background: var(--signal) !important;
-  border-color: var(--signal) !important;
+  background: #8b5cf6 !important;
+  border-color: #8b5cf6 !important;
 }
 
-.stSelectbox label, .stMultiSelect label, .stNumberInput label, .stFileUploader label {
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  color: var(--ink-soft);
-}
 .stFileUploader [data-testid="stFileUploadDropzone"] {
-  border: 1px solid var(--chrome-indigo);
-  clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px);
-  background: var(--surface);
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 12px;
+  border: 1px dashed rgba(139, 92, 246, 0.4);
+  border-radius: 16px;
+  background: rgba(139, 92, 246, 0.02);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 13px;
+  padding: 24px;
+  transition: all 0.2s ease;
+  clip-path: none !important;
+}
+.stFileUploader [data-testid="stFileUploadDropzone"]:hover {
+  border-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.05);
 }
 
 /* ══════════════════════════════════════════════════════════
-   PROGRESS — Signal Orange Bar
+   PROGRESS & UTILITIES
    ══════════════════════════════════════════════════════════ */
 .stProgress > div > div > div > div {
-  background: var(--signal) !important;
-  clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px) !important;
+  background: linear-gradient(90deg, #8b5cf6, #ec4899) !important;
+  clip-path: none !important;
+  border-radius: 8px !important;
 }
 .stProgress > div > div > div {
-  background: var(--chrome-indigo) !important;
-  clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px) !important;
-  height: 8px !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  clip-path: none !important;
+  border-radius: 8px !important;
+  height: 6px !important;
 }
 
-/* ══════════════════════════════════════════════════════════
-   ALERTS — Nintendo Red for Error
-   ══════════════════════════════════════════════════════════ */
 .stAlert {
-  clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px);
-  border-left: 3px solid var(--nintendo-red);
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 12px;
+  clip-path: none !important;
+  border-radius: 12px;
+  border-left: 4px solid var(--nintendo-red);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 13px;
+  background: rgba(239, 68, 68, 0.05) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-/* ══════════════════════════════════════════════════════════
-   BADGES — Amber Utility Chips
-   ══════════════════════════════════════════════════════════ */
 .badge {
   display: inline-block;
-  padding: 2px 8px;
-  clip-path: polygon(2px 0, 100% 0, 100% calc(100% - 2px), calc(100% - 2px) 100%, 0 100%, 0 2px);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.3px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  letter-spacing: 0.5px;
+  clip-path: none !important;
 }
-.badge-green { background: var(--amber); color: var(--carbon); }
-.badge-gray { background: var(--platinum); color: var(--muted-indigo); }
-.badge-red { background: var(--nintendo-red); color: var(--surface); }
-.badge-blue { background: var(--sky); color: var(--carbon); }
+.badge-green { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+.badge-gray { background: rgba(255, 255, 255, 0.05); color: #94a3b8; }
+.badge-red { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.badge-blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
 
 /* ══════════════════════════════════════════════════════════
-   VIDEO — Chamfered Beveled Frame
-   ══════════════════════════════════════════════════════════ */
-video {
-  clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
-  border: 1px solid var(--chrome-indigo);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
-}
-
-/* ══════════════════════════════════════════════════════════
-   DIVIDER
-   ══════════════════════════════════════════════════════════ */
-hr {
-  border: none !important;
-  border-top: 1px solid var(--chrome-indigo) !important;
-  margin: var(--sp-lg) 0 !important;
-}
-
-/* ══════════════════════════════════════════════════════════
-   EXPANDER — Carbon Header
+   EXPANDERS
    ══════════════════════════════════════════════════════════ */
 .streamlit-expanderHeader {
-  font-family: Arial, Helvetica, sans-serif !important;
-  font-weight: 700 !important;
-  font-size: 12px !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.3px !important;
-  color: var(--surface) !important;
-  background: var(--carbon) !important;
-  clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px) !important;
-  padding: var(--sp-sm) var(--sp-md) !important;
+  font-family: 'Plus Jakarta Sans', sans-serif !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  text-transform: none !important;
+  letter-spacing: 0px !important;
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-radius: 12px !important;
+  padding: 12px 16px !important;
+  clip-path: none !important;
 }
 .streamlit-expanderContent {
-  background: var(--periwinkle) !important;
+  background: rgba(255, 255, 255, 0.01) !important;
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+  border-top: none !important;
+  border-radius: 0 0 12px 12px !important;
   padding: var(--sp-md) !important;
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.2),
-    inset 0 -1px 0 var(--chrome-indigo);
+  box-shadow: none;
 }
 
 /* ══════════════════════════════════════════════════════════
-   SKELETON LOADING
+   MEDIA & LAYOUTS
    ══════════════════════════════════════════════════════════ */
-@keyframes skeleton-loading {
-  0% { background-position: -200px 0; }
-  100% { background-position: calc(200px + 100%) 0; }
-}
-.skeleton {
-  background: linear-gradient(90deg, var(--chrome-indigo) 25%, rgba(255,255,255,0.1) 50%, var(--chrome-indigo) 75%);
-  background-size: 200px 100%;
-  animation: skeleton-loading 1.5s ease-in-out infinite;
-  clip-path: polygon(2px 0, 100% 0, 100% calc(100% - 2px), calc(100% - 2px) 100%, 0 100%, 0 2px);
-  height: 16px;
-  margin-bottom: var(--sp-sm);
+video {
+  border-radius: 16px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+  clip-path: none !important;
 }
 
-/* ══════════════════════════════════════════════════════════
-   METRICS
-   ══════════════════════════════════════════════════════════ */
+hr {
+  border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+  margin: var(--sp-lg) 0 !important;
+}
+.dotted-divider {
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+
 .stMetric {
-  background: var(--periwinkle);
-  clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px);
-  padding: var(--sp-md);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.3),
-    inset 0 -1px 0 var(--chrome-indigo);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: var(--sp-lg);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  clip-path: none !important;
 }
 .stMetric label {
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 10px;
-  font-weight: 700;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--ink-soft);
 }
 .stMetric [data-testid="stMetricValue"] {
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 24px;
-  font-weight: 900;
-  color: var(--carbon);
-}
-
-/* ══════════════════════════════════════════════════════════
-   LINKS & TEXT
-   ══════════════════════════════════════════════════════════ */
-a {
-  color: var(--ink-soft) !important;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 28px;
   font-weight: 700;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 12px;
+  color: #fff;
 }
-a:hover { color: var(--nav-gold) !important; }
 
-h1, h2, h3, h4, h5, h6 {
-  font-family: Arial, Helvetica, sans-serif;
-  color: var(--carbon);
+@keyframes skeleton-loading {
+  0% { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
 }
-p {
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--ink);
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(139,92,246,0.1) 50%, rgba(255,255,255,0.03) 75%);
+  background-size: 200px 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: 6px;
+  height: 16px;
+  clip-path: none !important;
+}
+
+a {
+  color: #a78bfa !important;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+a:hover { color: #f472b6 !important; }
+
+p, code, small {
+  font-family: 'Plus Jakarta Sans', sans-serif;
 }
 code {
-  font-size: 11px;
-  background: var(--platinum);
-  padding: 1px 4px;
-  clip-path: polygon(2px 0, 100% 0, 100% calc(100% - 2px), calc(100% - 2px) 100%, 0 100%, 0 2px);
-  border: 1px solid var(--chrome-indigo);
-}
-small { font-size: 10px; color: var(--muted-indigo); }
-
-/* ══════════════════════════════════════════════════════════
-   TOAST / SUCCESS / ERROR / WARNING
-   ══════════════════════════════════════════════════════════ */
-.stSuccess, .stInfo {
-  background: var(--sky) !important;
-  border-left: 3px solid var(--systems-teal) !important;
-  font-family: Arial, Helvetica, sans-serif;
   font-size: 12px;
-  clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px);
-}
-.stError {
-  background: rgba(230,0,18,0.05) !important;
-  border-left: 3px solid var(--nintendo-red) !important;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 12px;
-  clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px);
-}
-.stWarning {
-  background: rgba(236,171,55,0.08) !important;
-  border-left: 3px solid var(--amber) !important;
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 12px;
-  clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f472b6;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 2px 6px;
+  clip-path: none !important;
 }
 
-.stSpinner {
-  font-family: Arial, Helvetica, sans-serif;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--ink-soft);
-}
-
-/* ══════════════════════════════════════════════════════════
-   HAMBURGER MENU — Tiga garis ☰ toggle sidebar
-   ══════════════════════════════════════════════════════════ */
+/* Hamburger menu wrap */
 .hamburger-wrap {
   position: absolute;
-  top: 6px;
-  left: 10px;
+  top: 10px;
+  left: 15px;
   z-index: 99999;
 }
 .hamburger-wrap .stButton > button {
-  width: 40px !important;
-  height: 40px !important;
-  min-width: 40px !important;
-  padding: 0 !important;
-  background: var(--carbon) !important;
-  border: 1px solid rgba(255,255,255,0.1) !important;
+  width: 42px !important;
+  height: 42px !important;
+  min-width: 42px !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 12px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  font-size: 20px !important;
-  font-weight: 400 !important;
-  color: var(--on-carbon) !important;
-  clip-path: polygon(3px 0, 100% 0, 100% calc(100% - 3px), calc(100% - 3px) 100%, 0 100%, 0 3px) !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important;
-  cursor: pointer !important;
-  line-height: 1 !important;
+  font-size: 22px !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2) !important;
+  clip-path: none !important;
 }
 .hamburger-wrap .stButton > button:hover {
-  background: var(--carbon-soft) !important;
-}
-.hamburger-wrap .stButton > button:active {
-  box-shadow: inset 0 2px 4px rgba(0,0,0,0.3) !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+  border-color: rgba(139, 92, 246, 0.4) !important;
 }
 
+.stSuccess, .stInfo {
+  background: rgba(16, 185, 129, 0.05) !important;
+  border-left: 4px solid #10b981 !important;
+  border-radius: 12px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 13px;
+  clip-path: none !important;
+}
 
-
-/* ══════════════════════════════════════════════════════════
-   SIDEBAR — Slide in/out via CSS variable
-   ══════════════════════════════════════════════════════════ */
 [data-testid="stSidebar"] {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
-/* ══════════════════════════════════════════════════════════
-   RESPONSIVE — Mobile Stack
-   ══════════════════════════════════════════════════════════ */
+/* RESPONSIVE */
 @media (max-width: 720px) {
-  /* Sembunyikan streamlit sidebar toggle bawaan, pake punya kita */
   [data-testid="stSidebarCollapsedControl"] {
     display: none !important;
   }
@@ -834,9 +724,8 @@ small { font-size: 10px; color: var(--muted-indigo); }
   .quick-actions-grid { grid-template-columns: 1fr; }
   .grid-3 { grid-template-columns: 1fr; }
   .grid-2 { grid-template-columns: 1fr; }
-  .step-bar { flex-wrap: wrap; gap: 4px; padding: var(--sp-sm); }
-  .step-item { font-size: 9px; }
-  .step-line { width: 10px; }
+  .step-bar { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .step-line { display: none; }
 }
 </style>"""
 
@@ -885,14 +774,14 @@ def _fmt_time(seconds):
 def _login_page():
     st.markdown("""
     <style>
-    .login-container { max-width: 400px; margin: 60px auto; text-align: center; }
-    .login-logo { font-size: 44px; margin-bottom: 8px; }
-    .login-title { font-size: 28px; font-weight: 900; letter-spacing: -0.3px; margin-bottom: 4px; color: var(--carbon); font-family: Arial, Helvetica, sans-serif; -webkit-text-stroke: 1px var(--surface); text-shadow: 2px 2px 0 rgba(0,0,0,0.15); }
-    .login-sub { font-size: 12px; color: var(--ink-soft); margin-bottom: 32px; font-family: Arial, Helvetica, sans-serif; }
-    .login-box { background: var(--periwinkle); clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); padding: var(--sp-xl); box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), inset 0 -1px 0 var(--chrome-indigo); }
-    .login-error { color: var(--nintendo-red); font-size: 11px; font-weight: 700; margin: 8px 0; font-family: Arial, Helvetica, sans-serif; }
-    .login-success { color: #3ecf8e; font-size: 11px; font-weight: 700; margin: 8px 0; font-family: Arial, Helvetica, sans-serif; }
-    .login-toggle { font-size: 11px; color: var(--ink-soft); margin-top: 16px; font-family: Arial, Helvetica, sans-serif; }
+    .login-container { max-width: 400px; margin: 80px auto; text-align: center; }
+    .login-logo { font-size: 48px; margin-bottom: 12px; filter: drop-shadow(0 0 10px rgba(124,58,237,0.5)); }
+    .login-title { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 6px; color: #fff; font-family: 'Space Grotesk', sans-serif; background: linear-gradient(to right, #a78bfa, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .login-sub { font-size: 13px; color: #94a3b8; margin-bottom: 32px; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .login-box { background: rgba(17,19,28,0.75); border: 1px solid rgba(255,255,255,0.08); border-radius: 20px; backdrop-filter: blur(16px); padding: 32px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+    .login-error { color: #f87171; font-size: 12px; font-weight: 600; margin: 8px 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .login-success { color: #34d399; font-size: 12px; font-weight: 600; margin: 8px 0; font-family: 'Plus Jakarta Sans', sans-serif; }
+    .login-toggle { font-size: 12px; color: var(--ink-soft); margin-top: 16px; font-family: 'Plus Jakarta Sans', sans-serif; }
     .login-toggle a { color: var(--nav-gold) !important; cursor: pointer; font-weight: 700; }
     </style>
     """, unsafe_allow_html=True)
@@ -1067,7 +956,7 @@ def page_dashboard():
             st.markdown(f"""
             <div class="queue-card" style="display:flex;justify-content:space-between;align-items:center;padding:var(--sp-md) var(--sp-lg)">
               <div>
-                <div style="font-weight:700;font-size:12px;color:var(--carbon)">{v.name}</div>
+                <div style="font-weight:700;font-size:12px;color:#fff">{v.name}</div>
                 <div style="font-size:10px;color:var(--ink-soft);margin-top:2px">{sz:.1f} MB · {mtime}</div>
               </div>
             </div>
@@ -1095,13 +984,12 @@ def _page_input():
 
     # Hero: Drag & Drop Zone Raksasa
     st.markdown(
-        '<div style="background:var(--periwinkle);padding:var(--sp-xl);'
-        'clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px);'
-        'box-shadow:inset 0 1px 0 rgba(255,255,255,0.3),inset 0 -1px 0 var(--chrome-indigo);'
-        'text-align:center;margin-bottom:var(--sp-lg)">'
-        '<div style="font-size:48px;margin-bottom:var(--sp-sm)">\U0001f4c1</div>'
-        '<p style="font-size:16px;font-weight:900;color:var(--carbon);margin:0 0 4px">Drop Video di Sini</p>'
-        '<p style="font-size:11px;color:var(--ink-soft);margin:0">'
+        '<div style="background:rgba(255,255,255,0.02);border:1px dashed rgba(139,92,246,0.3);'
+        'border-radius:20px;padding:var(--sp-xl);'
+        'text-align:center;margin-bottom:var(--sp-lg);box-shadow:0 8px 32px rgba(0,0,0,0.15)">'
+        '<div style="font-size:48px;margin-bottom:var(--sp-sm);filter:drop-shadow(0 0 8px rgba(139,92,246,0.3))">📁</div>'
+        '<p style="font-size:18px;font-weight:700;color:#fff;margin:0 0 6px">Drop Video di Sini</p>'
+        '<p style="font-size:13px;color:var(--ink-soft);margin:0">'
         'MP4, MOV, AVI, MKV, WEBM &mdash; langsung detect momen viral tanpa download'
         '</p></div>',
         unsafe_allow_html=True
@@ -1131,6 +1019,7 @@ def _page_input():
             st.session_state.src = "local"
             st.session_state.local_path = p
             st.session_state.local_name = up.name
+            st.session_state.page = "dashboard"
             st.session_state.processing = True
             st.session_state.step = 2
             st.rerun()
@@ -1323,10 +1212,10 @@ def _page_curate():
         st.markdown(f"""
         <div class="moment-card" style="padding:var(--sp-lg)">
           <div style="display:flex;align-items:center;gap:var(--sp-md)">
-            <div style="width:40px;height:40px;background:var(--platinum);clip-path:polygon(3px 0,100% 0,100% calc(100% - 3px),calc(100% - 3px) 100%,0 100%,0 3px);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;box-shadow:inset 0 1px 0 rgba(255,255,255,0.3),inset 0 -1px 0 var(--chrome-indigo)">{icon}</div>
+            <div style="width:40px;height:40px;background:rgba(255,255,255,0.04);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;border:1px solid rgba(255,255,255,0.06)">{icon}</div>
             <div style="flex:1;min-width:0">
               <div style="display:flex;align-items:center;gap:var(--sp-sm);flex-wrap:wrap">
-                <span style="font-weight:700;font-size:13px;color:var(--carbon);font-family:Arial,sans-serif">{m.category}</span>
+                <span style="font-weight:700;font-size:13px;color:#fff;font-family:Arial,sans-serif">{m.category}</span>
                 <span class="badge badge-green">{d:.0f}s</span>
               </div>
               <p style="margin:2px 0 0;font-size:11px;color:var(--ink-soft)">\U0001f504 Mulai: <strong>{_fmt_time(m.start_time)}</strong> \u2013 Selesai: <strong>{_fmt_time(m.end_time)}</strong> (durasi: {d:.0f}s)</p>
@@ -1361,11 +1250,11 @@ def _page_editor():
     st.markdown(f'<p style="font-size:11px;color:var(--ink-soft);margin-bottom:var(--sp-lg);font-weight:700;text-transform:uppercase;letter-spacing:0.3px">Duration: {ev-sv:.1f}s</p>', unsafe_allow_html=True)
     clip_dur = ev - sv
     st.markdown(f"""
-    <div style="background:var(--periwinkle);border:1px solid var(--chrome-indigo);clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);padding:var(--sp-md);margin-bottom:var(--sp-lg);box-shadow:inset 0 1px 0 rgba(255,255,255,0.2),inset 0 -1px 0 var(--chrome-indigo)">
+    <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:var(--sp-md);margin-bottom:var(--sp-lg)">
       <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--muted-indigo);margin-bottom:4px">
         <span>{sv:.1f}s</span><span>{ev:.1f}s</span>
       </div>
-      <div style="height:20px;background:var(--platinum);clip-path:polygon(3px 0,100% 0,100% calc(100% - 3px),calc(100% - 3px) 100%,0 100%,0 3px);position:relative;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,0.5),inset 0 -1px 0 var(--chrome-indigo)">
+      <div style="height:20px;background:rgba(255,255,255,0.03);border-radius:6px;position:relative;overflow:hidden">
         <div style="height:100%;width:{min(100,clip_dur/max(dur,0.1)*100)}%;background:var(--signal);opacity:0.8"></div>
       </div>
       <div style="font-size:10px;color:var(--ink-soft);margin-top:4px;font-weight:700">Clip: {clip_dur:.1f}s / Total: {dur:.0f}s</div>
@@ -1390,7 +1279,7 @@ def _page_editor():
             st.session_state._rendering_preview = True
             try:
                 subprocess.run([
-                    "ffmpeg", "-y",
+                    FFMPEG_PATH, "-y",
                     "-ss", str(sv), "-i", res.video_path,
                     "-t", str(min(clip_dur, 30)),
                     "-vf", "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2",
@@ -1420,17 +1309,14 @@ def _page_editor():
                 st.video(preview_path)
                 # Text overlay preview (real-time, langsung kelihatan)
                 # Muncul di bawah video, distyling seperti overlay gelap
-                try:
-                    _ov = text_overlay or ""
-                except NameError:
-                    _ov = ""
+                _ov = st.session_state.get("editor_text_overlay", "")
                 if _ov.strip():
                     _ov_escaped = _ov.strip().replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
                     _ov_html = _ov_escaped.replace(chr(10), '<br>')
                     st.markdown(
                         f'<div style="background:rgba(0,0,0,0.7);color:white;padding:12px 16px;'
                         f'margin-top:4px;font-size:16px;font-weight:700;text-align:center;'
-                        f'clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);'
+                        f'border-radius:12px;'
                         f'border-left:3px solid var(--signal,#f68d1f)">{_ov_html}</div>',
                         unsafe_allow_html=True
                     )
@@ -1445,12 +1331,12 @@ def _page_editor():
 
         with col_vid2:
             st.markdown(f"""
-            <div style="background:var(--periwinkle);padding:var(--sp-md);clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);box-shadow:inset 0 1px 0 rgba(255,255,255,0.2),inset 0 -1px 0 var(--chrome-indigo)">
+            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:var(--sp-md)">
               <p style="font-size:10px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.3px;margin:0 0 6px">\u2139 Info</p>
-              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Mulai:</strong> {_fmt_time(sv)}</p>
-              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Selesai:</strong> {_fmt_time(ev)}</p>
-              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Durasi:</strong> {clip_dur:.0f}s</p>
-              <p style="font-size:11px;color:var(--carbon);margin:2px 0"><strong>Kategori:</strong> {mom.category}</p>
+              <p style="font-size:11px;color:#fff;margin:2px 0"><strong>Mulai:</strong> {_fmt_time(sv)}</p>
+              <p style="font-size:11px;color:#fff;margin:2px 0"><strong>Selesai:</strong> {_fmt_time(ev)}</p>
+              <p style="font-size:11px;color:#fff;margin:2px 0"><strong>Durasi:</strong> {clip_dur:.0f}s</p>
+              <p style="font-size:11px;color:#fff;margin:2px 0"><strong>Kategori:</strong> {mom.category}</p>
               <hr style="margin:8px 0;border:none;border-top:1px dotted var(--muted-indigo)">
               <p style="font-size:9px;color:var(--muted-indigo);margin:0;line-height:1.3">
                 \u26a0 Preview ini hanya klip mentah. Efek, subtitle, transisi, teks overlay, dll akan terlihat <strong>setelah Render</strong>.
@@ -1492,7 +1378,7 @@ def _page_editor():
         rev = st.checkbox("Putar Mundur (Reverse Video)", value=False, help="Video akan diputar dari akhir ke awal seperti efek mundur di CapCut")
     with tabs[3]:
         st.markdown('<p style="font-size:11px;font-weight:700;margin-bottom:var(--sp-sm);text-transform:uppercase;letter-spacing:0.3px;color:var(--ink-soft)">Text Overlay</p>', unsafe_allow_html=True)
-        text_overlay = st.text_area("Teks Overlay", "", height=80, placeholder="Teks yang akan ditampilkan di tengah video...", label_visibility="collapsed", help="Teks akan muncul di tengah video dengan efek animasi")
+        text_overlay = st.text_area("Teks Overlay", "", height=80, placeholder="Teks yang akan ditampilkan di tengah video...", label_visibility="collapsed", help="Teks akan muncul di tengah video dengan efek animasi", key="editor_text_overlay")
         st.markdown('<hr class="dotted-divider">', unsafe_allow_html=True)
         st.markdown('<p style="font-size:11px;font-weight:700;margin-bottom:var(--sp-sm);text-transform:uppercase;letter-spacing:0.3px;color:var(--ink-soft)">Chroma Key / Green Screen</p>', unsafe_allow_html=True)
         ck_enable = st.checkbox("Aktifkan Chroma Key", value=False, help="Hilangkan background hijau/biru seperti di CapCut")
@@ -1630,12 +1516,14 @@ def _page_editor():
         step_msg = st.session_state.render_step
         st.progress(prog_val)
         st.markdown(
-            f'<div style="background:var(--periwinkle);padding:var(--sp-md);clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);box-shadow:inset 0 1px 0 rgba(255,255,255,0.2),inset 0 -1px 0 var(--chrome-indigo)">'
-            f'<p style="font-size:11px;color:var(--carbon);font-weight:700;margin:0">{step_msg}</p>'
+            f'<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:var(--sp-md)">'
+            f'<p style="font-size:11px;color:#fff;font-weight:700;margin:0">{step_msg}</p>'
             f'<p style="font-size:10px;color:var(--muted-indigo);margin:4px 0 0">{prog_val*100:.0f}%</p>'
             f'</div>',
             unsafe_allow_html=True
         )
+        time.sleep(1)
+        st.rerun()
 
     # ── Render Result (inline setelah render selesai) ────────────
     if st.session_state.render_done and st.session_state.out_video:
@@ -1643,8 +1531,8 @@ def _page_editor():
         if Path(ov).exists():
             sz = Path(ov).stat().st_size / (1024*1024)
             st.markdown(
-                '<div style="background:var(--sky);padding:var(--sp-md);clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);box-shadow:inset 0 1px 0 rgba(255,255,255,0.3),inset 0 -1px 0 var(--systems-teal);margin-bottom:var(--sp-lg)">'
-                '<p style="font-size:13px;font-weight:900;color:var(--carbon);margin:0 0 2px">\u2714\ufe0f Render Selesai!</p>'
+                '<div style="background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.15);border-radius:12px;padding:var(--sp-md);margin-bottom:var(--sp-lg)">'
+                '<p style="font-size:13px;font-weight:900;color:#fff;margin:0 0 2px">\u2714\ufe0f Render Selesai!</p>'
                 f'<p style="font-size:10px;color:var(--ink-soft);margin:0">{os.path.basename(ov)} \u2022 {sz:.1f} MB</p>'
                 '</div>',
                 unsafe_allow_html=True
@@ -1669,8 +1557,8 @@ def _page_editor():
     fx_preview = st.session_state.get("preview_fx_path")
     if fx_preview and Path(fx_preview).exists() and not st.session_state.rendering:
         st.markdown(
-            '<div style="background:var(--periwinkle);padding:var(--sp-md);clip-path:polygon(4px 0,100% 0,100% calc(100% - 4px),calc(100% - 4px) 100%,0 100%,0 4px);margin-bottom:var(--sp-sm)">'
-            '<p style="font-size:11px;font-weight:700;color:var(--carbon);margin:0">\U0001f441 Preview Efek</p>'
+            '<div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:var(--sp-md);margin-bottom:var(--sp-sm)">'
+            '<p style="font-size:11px;font-weight:700;color:#fff;margin:0">\U0001f441 Preview Efek</p>'
             '<p style="font-size:9px;color:var(--muted-indigo);margin:2px 0 0">Preview 3 detik dengan efek saat ini</p>'
             '</div>',
             unsafe_allow_html=True
@@ -1928,7 +1816,7 @@ def page_my_clips():
         <div class="queue-card">
           <div style="display:flex;justify-content:space-between;align-items:center">
             <div style="flex:1;min-width:0">
-              <div style="font-weight:700;font-size:12px;color:var(--carbon);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{v.name}</div>
+              <div style="font-weight:700;font-size:12px;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{v.name}</div>
               <div style="font-size:10px;color:var(--ink-soft);margin:2px 0">{sz:.1f} MB · {mtime}</div>
             </div>
           </div>
@@ -1977,7 +1865,7 @@ def page_queue():
         <div class="queue-card">
           <div style="display:flex;justify-content:space-between;align-items:start">
             <div style="flex:1;min-width:0">
-              <div style="font-size:12px;font-weight:700;color:var(--carbon);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{item['url'][:60]}</div>
+              <div style="font-size:12px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{item['url'][:60]}</div>
               <div style="font-size:10px;color:var(--ink-soft);margin:4px 0">
                 <span class="badge {status_badge}">{item['status']}</span>
                 {' '.join(item.get('platforms',['youtube']))} · {item.get('schedule_at','unscheduled')}
@@ -2002,7 +1890,7 @@ def page_queue():
         target = next((i for i in qq if i['id'] == edit_id), None)
         if target:
             st.markdown("<hr>", unsafe_allow_html=True)
-            st.markdown(f'<h3 style="font-size:16px;font-weight:900;color:var(--carbon)">Edit Queue Item</h3>', unsafe_allow_html=True)
+            st.markdown(f'<h3 style="font-size:16px;font-weight:900;color:#fff">Edit Queue Item</h3>', unsafe_allow_html=True)
             new_url = st.text_input("URL", target['url'])
             new_plat = st.multiselect("Platforms", ["youtube","tiktok","facebook"], default=target.get('platforms',['youtube']))
             new_sched = st.text_input("Schedule (HH:MM)", target.get('schedule_at',''))
@@ -2029,7 +1917,7 @@ def page_accounts():
         st.markdown(f"""
         <div class="queue-card" style="display:flex;justify-content:space-between;align-items:center">
           <div>
-            <div style="font-weight:700;font-size:13px;color:var(--carbon)"><span style="color:{clr}">{dot}</span> {plat.title()}</div>
+            <div style="font-weight:700;font-size:13px;color:#fff"><span style="color:{clr}">{dot}</span> {plat.title()}</div>
             <div style="font-size:10px;color:var(--ink-soft)">{'Connected' if sts=='connected' else 'Disconnected'} · {msg}</div>
           </div>
         </div>
@@ -2073,7 +1961,7 @@ def page_schedule():
         st.markdown(f"""
         <div class="queue-card" style="display:flex;justify-content:space-between;align-items:center">
           <div>
-            <div style="font-weight:700;font-size:13px;color:var(--carbon)">{name}</div>
+            <div style="font-weight:700;font-size:13px;color:#fff">{name}</div>
             <div style="font-size:10px;color:var(--ink-soft)">{', '.join(data.get('times',[]))}</div>
           </div>
         </div>
@@ -2159,6 +2047,11 @@ def main():
             st.session_state.ollama_model = custom_model
         else:
             st.session_state.ollama_model = sel_model
+
+        st.markdown('<div class="sidebar-model" style="margin-top:var(--sp-md)"><label>Auto Cookies Browser</label></div>', unsafe_allow_html=True)
+        browsers = ["None", "chrome", "edge", "firefox", "brave", "opera", "vivaldi"]
+        st.selectbox("Cookies dari Browser", browsers, index=0, key="local_browser_cookies", label_visibility="collapsed", help="Ambil cookies langsung dari browser lokal Anda secara gratis agar terhindar dari pemblokiran YouTube/TikTok.")
+
         st.markdown('<div class="sidebar-accounts">', unsafe_allow_html=True)
         for plat in ["youtube","tiktok","facebook"]:
             sts, msg = _account_status(plat)

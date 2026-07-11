@@ -1,4 +1,4 @@
-import os, subprocess, uuid, random, math
+import os, subprocess, uuid, random, math, shutil
 from pathlib import Path
 from typing import List, Tuple
 
@@ -46,6 +46,258 @@ TEXT_ANIMATIONS = {
     "shake": "shake",
     "glitch_text": "glitch",
 }
+
+# ── JumpCutDetector — hapus bagian monoton/boring otomatis ────────
+class JumpCutDetector:
+    """Detect monotonous/boring segments in video using ffmpeg scene detection
+    and motion analysis. Removes slow, low-motion parts automatically."""
+
+    @staticmethod
+    def detect_scene_changes(in_vid: str, threshold: float = 0.3) -> list:
+        """Detect scene changes using ffmpeg scene filter.
+        Returns list of frame timestamps where scenes change."""
+        if not Path(in_vid).exists():
+            return []
+        cmd = [FFMPEG_PATH, "-i", in_vid,
+               "-filter:v", f"select='gt(scene,{threshold})'",
+               "-f", "null", "-"]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            output = r.stderr
+        except:
+            return []
+        # Parse pts_time from scene detection output
+        changes = []
+        for line in output.split("\n"):
+            if "pts_time:" in line:
+                try:
+                    t = float(line.split("pts_time:")[1].strip().split()[0])
+                    changes.append(t)
+                except:
+                    pass
+        return changes
+
+    @staticmethod
+    def detect_boring_segments(in_vid: str, motion_thresh: float = 0.1,
+                                min_boring_dur: float = 2.0) -> list:
+        """Detect boring (low motion / no scene change) segments.
+        Returns list of (start, end) tuples of boring segments to remove."""
+        changes = JumpCutDetector.detect_scene_changes(in_vid, motion_thresh)
+        if not changes:
+            return []
+
+        r = subprocess.run([FFMPEG_PATH, "-v", "error", "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1", in_vid], capture_output=True, text=True)
+        try:
+            total_dur = float(r.stdout.strip())
+        except:
+            total_dur = 0
+
+        if total_dur <= 0:
+            return []
+
+        # Segments between scene changes with low motion are boring
+        boring = []
+        prev = 0.0
+        for ch in sorted(changes):
+            gap = ch - prev
+            if gap >= min_boring_dur:
+                boring.append((prev, ch))
+            prev = ch
+        # Check tail
+        if total_dur - prev >= min_boring_dur:
+            boring.append((prev, total_dur))
+
+        return boring
+
+    @staticmethod
+    def remove_jump_cuts(in_vid: str, out: str, motion_thresh: float = 0.15,
+                          min_keep_dur: float = 1.5, min_boring_dur: float = 2.0) -> Tuple[bool, str, float]:
+        """Remove boring/monotonous segments (jump cuts).
+        Keeps only segments with significant scene changes or motion.
+        Returns (success, error, original_duration)."""
+        if not Path(in_vid).exists():
+            return False, "File tidak ditemukan", 0
+
+        r = subprocess.run([FFMPEG_PATH, "-v", "error", "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1", in_vid], capture_output=True, text=True)
+        try:
+            total_dur = float(r.stdout.strip())
+        except:
+            total_dur = 0
+
+        if total_dur <= 0:
+            return False, "Gagal dapat durasi", 0
+
+        # Detect boring segments
+        boring = JumpCutDetector.detect_boring_segments(in_vid, motion_thresh, min_boring_dur)
+        if not boring:
+            shutil.copy2(in_vid, out)
+            return True, "", total_dur
+
+        # Build keep segments (inverse of boring)
+        keep = []
+        cur = 0.0
+        for bs, be in boring:
+            if bs > cur and (bs - cur) >= min_keep_dur:
+                keep.append((cur, bs))
+            cur = be
+        if total_dur > cur and (total_dur - cur) >= min_keep_dur:
+            keep.append((cur, total_dur))
+
+        if not keep:
+            return False, "Semua segmen terdeteksi boring", total_dur
+
+        if len(keep) == 1 and keep[0][0] == 0 and abs(keep[0][1] - total_dur) < 1.0:
+            shutil.copy2(in_vid, out)
+            return True, "", total_dur
+
+        # Build select filter
+        select_parts = []
+        for ks, ke in keep:
+            select_parts.append(f"between(t,{ks},{ke})")
+        select_expr = "+".join(select_parts)
+
+        cmd = [FFMPEG_PATH, "-y", "-i", in_vid,
+               "-filter_complex",
+               f"[0:v]select='{select_expr}',setpts=N/FRAME_RATE/TB[outv];"
+               f"[0:a]aselect='{select_expr}',asetpts=N/SAMPLE_RATE/TB[outa]",
+               "-map", "[outv]", "-map", "[outa]",
+               "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+               "-c:a", "aac", "-b:a", "128k",
+               "-movflags", "+faststart", out]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            if r.returncode != 0:
+                return False, r.stderr[-500:], total_dur
+            if Path(out).exists():
+                return True, "", total_dur
+            return False, "Output tidak dibuat", total_dur
+        except subprocess.TimeoutExpired:
+            return False, "Timeout", total_dur
+        except Exception as e:
+            return False, str(e), total_dur
+
+
+# ── SilenceRemover — seperti Videotto smart dead space removal ──────
+class SilenceRemover:
+    """Detect and remove silence/dead space from video using ffmpeg silencedetect.
+    Like Videotto's auto dead space removal."""
+
+    @staticmethod
+    def detect_silence(in_vid: str, noise_thresh: str = "-30dB", min_silence_dur: float = 0.5) -> list:
+        """Detect silent segments in video. Returns list of (start, end) tuples."""
+        if not Path(in_vid).exists():
+            return []
+        cmd = [FFMPEG_PATH, "-i", in_vid,
+               "-af", f"silencedetect=noise={noise_thresh}:d={min_silence_dur}",
+               "-f", "null", "-"]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            output = r.stderr
+        except:
+            return []
+
+        # Parse silencedetect output
+        silences = []
+        start, end = None, None
+        for line in output.split("\n"):
+            if "silence_start:" in line:
+                try:
+                    start = float(line.split("silence_start:")[1].strip())
+                except:
+                    pass
+            elif "silence_end:" in line:
+                try:
+                    parts = line.split("silence_end:")[1].strip().split("|")
+                    end = float(parts[0].strip())
+                    if start is not None:
+                        silences.append((start, end))
+                        start, end = None, None
+                except:
+                    pass
+        return silences
+
+    @staticmethod
+    def get_keep_segments(silences: list, total_dur: float, min_keep_dur: float = 0.5) -> list:
+        """Convert silence segments into non-silence segments to keep.
+        Returns list of (start, end) tuples of segments to keep."""
+        if not silences:
+            return [(0, total_dur)]
+
+        keep = []
+        cur = 0.0
+        for s_start, s_end in silences:
+            if s_start > cur and (s_start - cur) >= min_keep_dur:
+                keep.append((cur, s_start))
+            cur = s_end
+        if total_dur > cur and (total_dur - cur) >= min_keep_dur:
+            keep.append((cur, total_dur))
+        return keep
+
+    @staticmethod
+    def remove_silence(in_vid: str, out: str, noise_thresh: str = "-30dB",
+                       min_silence_dur: float = 0.5, min_keep_dur: float = 0.5) -> Tuple[bool, str, float]:
+        """Remove silence/dead space from video. Returns (success, error, original_duration).
+        Uses ffmpeg select filter to concatenate only non-silent segments."""
+        if not Path(in_vid).exists():
+            return False, "File tidak ditemukan", 0
+
+        # Get original duration
+        r = subprocess.run([FFMPEG_PATH, "-v", "error", "-show_entries", "format=duration",
+            "-of", "default=noprint_wrappers=1:nokey=1", in_vid], capture_output=True, text=True)
+        try:
+            total_dur = float(r.stdout.strip())
+        except:
+            total_dur = 0
+
+        if total_dur <= 0:
+            return False, "Gagal dapat durasi video", 0
+
+        # Detect silence
+        silences = SilenceRemover.detect_silence(in_vid, noise_thresh, min_silence_dur)
+        if not silences:
+            # No silence detected, just copy
+            shutil.copy2(in_vid, out)
+            return True, "", total_dur
+
+        # Get keep segments
+        keep = SilenceRemover.get_keep_segments(silences, total_dur, min_keep_dur)
+        if not keep:
+            return False, "Tidak ada segmen yang bisa disimpan setelah hapus silence", total_dur
+
+        if len(keep) == 1 and keep[0][0] == 0 and abs(keep[0][1] - total_dur) < 0.5:
+            # No significant silence found, just copy
+            shutil.copy2(in_vid, out)
+            return True, "", total_dur
+
+        # Build select filter: keep only non-silent segments
+        select_parts = []
+        for ks, ke in keep:
+            select_parts.append(f"between(t,{ks},{ke})")
+        select_expr = "+".join(select_parts)
+
+        cmd = [FFMPEG_PATH, "-y", "-i", in_vid,
+               "-filter_complex",
+               f"[0:v]select='{select_expr}',setpts=N/FRAME_RATE/TB[outv];"
+               f"[0:a]aselect='{select_expr}',asetpts=N/SAMPLE_RATE/TB[outa]",
+               "-map", "[outv]", "-map", "[outa]",
+               "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+               "-c:a", "aac", "-b:a", "128k",
+               "-movflags", "+faststart",
+               out]
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            if r.returncode != 0:
+                return False, r.stderr[-500:], total_dur
+            if Path(out).exists():
+                return True, "", total_dur
+            return False, "Output file not created", total_dur
+        except subprocess.TimeoutExpired:
+            return False, "Timeout saat hapus silence", total_dur
+        except Exception as e:
+            return False, str(e), total_dur
+
 
 # ── New CapCut-like features ─────────────────────────────────
 CHROMA_KEY_COLORS = {
@@ -195,14 +447,96 @@ class VideoProcessor:
                      ken_zoom_end: float=1.3,
                      blur_bg: str="none",
                      stabilize: bool=False,
-                     stabilize_shakiness: int=5) -> Tuple[bool, str]:
+                     stabilize_shakiness: int=5,
+                     # ── Silence Removal (seperti Videotto) ──────────
+                     remove_silence: bool=False,
+                     silence_noise_thresh: str="-30dB",
+                     silence_min_dur: float=0.5,
+                     # ── Jump Cut / Boring Removal ────────────────────
+                     jump_cut: bool=False,
+                     jump_cut_thresh: float=0.15) -> Tuple[bool, str]:
         if not Path(in_vid).exists(): return False, "File tidak ditemukan"
-        if ett <= stt:
+
+        # ── Calculate base duration ──
+        if ett > stt:
+            dur = ett - stt
+        else:
             r = subprocess.run([FFMPEG_PATH,"-v","error","-show_entries","format=duration",
-                "-of","default=noprint_wrappers=1:nokey=1",in_vid], capture_output=True, text=True)
+                "-of","default=noprint_wrappers=1:nokey=1", in_vid], capture_output=True, text=True)
             try: dur = float(r.stdout.strip())
             except: dur = 60
-        else: dur = ett - stt
+            ett = stt + dur
+
+        # ── Step 0: Silence Removal + Jump Cut — apply AFTER trimming ──
+        effective_input, temp_files = in_vid, []
+        if remove_silence and dur > 0:
+            # First trim to clip range, then remove silence on trimmed result
+            trimmed = os.path.join(os.path.dirname(out) or ".", f"_trim_{uuid.uuid4().hex[:8]}.mp4")
+            trim_cmd = [FFMPEG_PATH, "-y", "-ss", str(stt), "-i", in_vid, "-t", str(dur),
+                        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                        "-c:a", "aac", "-b:a", "128k", trimmed]
+            try:
+                subprocess.run(trim_cmd, capture_output=True, text=True, timeout=300)
+            except:
+                pass
+
+            if Path(trimmed).exists():
+                silence_out = os.path.join(os.path.dirname(out) or ".", f"_nosilence_{uuid.uuid4().hex[:8]}.mp4")
+                temp_files.append(silence_out)
+                ok, err = SilenceRemover.remove_silence(trimmed, silence_out,
+                    noise_thresh=silence_noise_thresh,
+                    min_silence_dur=silence_min_dur)[:2]
+                # Clean up trimmed temp file
+                try: Path(trimmed).unlink(missing_ok=True)
+                except: pass
+
+                if ok and Path(silence_out).exists():
+                    effective_input = silence_out
+                    stt = 0
+                    r = subprocess.run([FFMPEG_PATH,"-v","error","-show_entries","format=duration",
+                        "-of","default=noprint_wrappers=1:nokey=1", silence_out],
+                        capture_output=True, text=True)
+                    try:
+                        new_dur = float(r.stdout.strip())
+                        if new_dur > 0:
+                            dur = new_dur
+                    except:
+                        pass
+                elif err:
+                    return False, f"Silence removal gagal: {err}"
+
+        # ── Step 0b: Jump Cut Removal — trim first if needed, then remove boring ──
+        if jump_cut and dur > 0:
+            # If stt > 0, trim first to avoid timestamp alignment bug
+            if stt > 0 and effective_input == in_vid:
+                trimmed_jc = os.path.join(os.path.dirname(out) or ".", f"_trim_jc_{uuid.uuid4().hex[:8]}.mp4")
+                trim_cmd = [FFMPEG_PATH, "-y", "-ss", str(stt), "-i", in_vid, "-t", str(dur),
+                            "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+                            "-c:a", "aac", "-b:a", "128k", trimmed_jc]
+                try:
+                    subprocess.run(trim_cmd, capture_output=True, text=True, timeout=300)
+                    if Path(trimmed_jc).exists():
+                        temp_files.append(trimmed_jc)
+                        effective_input = trimmed_jc
+                        stt = 0
+                except:
+                    pass
+            jump_out = os.path.join(os.path.dirname(out) or ".", f"_jump_{uuid.uuid4().hex[:8]}.mp4")
+            temp_files.append(jump_out)
+            ok, err = JumpCutDetector.remove_jump_cuts(effective_input, jump_out,
+                motion_thresh=jump_cut_thresh)[:2]
+            if ok and Path(jump_out).exists():
+                effective_input = jump_out
+                stt = 0
+                r = subprocess.run([FFMPEG_PATH,"-v","error","-show_entries","format=duration",
+                    "-of","default=noprint_wrappers=1:nokey=1", jump_out],
+                    capture_output=True, text=True)
+                try:
+                    new_dur = float(r.stdout.strip())
+                    if new_dur > 0:
+                        dur = new_dur
+                except:
+                    pass
         if dur <= 0: dur = 10
         fade_in = min(fade_in, dur/2); fade_out = min(fade_out, dur/2)
         fout_start = dur - fade_out
@@ -313,7 +647,7 @@ class VideoProcessor:
             audio_filters.append(f"afade=t=out:st={fout_start}:d={fade_out}")
 
         # Build command
-        cmd = [FFMPEG_PATH, "-y", "-ss", str(stt), "-i", in_vid]
+        cmd = [FFMPEG_PATH, "-y", "-ss", str(stt), "-i", effective_input]
 
         # PIP video input
         if pip_video and Path(pip_video).exists():
@@ -350,10 +684,26 @@ class VideoProcessor:
 
         try:
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-            if r.returncode != 0: return False, r.stderr[-500:]
+            if r.returncode != 0:
+                for tf in temp_files:
+                    try: Path(tf).unlink(missing_ok=True)
+                    except: pass
+                return False, r.stderr[-500:]
+            # Clean up all temp files
+            for tf in temp_files:
+                try: Path(tf).unlink(missing_ok=True)
+                except: pass
             return True, ""
-        except subprocess.TimeoutExpired: return False, "Timeout"
-        except Exception as e: return False, str(e)
+        except subprocess.TimeoutExpired:
+            for tf in temp_files:
+                try: Path(tf).unlink(missing_ok=True)
+                except: pass
+            return False, "Timeout"
+        except Exception as e:
+            for tf in temp_files:
+                try: Path(tf).unlink(missing_ok=True)
+                except: pass
+            return False, str(e)
 
     @staticmethod
     def auto_process(url: str, work_dir: str, min_dur: float = 30, max_dur: float = 60,

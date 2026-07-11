@@ -14,6 +14,15 @@ OpusClip-inspired tool to create viral clips from YouTube/TikTok/Facebook videos
 - Farm mode: batch process multiple clips
 - **Mobile responsive**: works on phone like Opus Clip
 
+## ⚡ One-Click Google Colab
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/nenocahya22-lgtm/cliper/blob/main/videoclipse_colab.ipynb)
+
+Click the badge above → **Runtime > Change runtime type > T4 GPU** → Run all cells → Click the ngrok URL!
+
+Atau buka manual:
+`https://colab.research.google.com/github/nenocahya22-lgtm/cliper/blob/main/videoclipse_colab.ipynb`
+
 ## Quick Start
 
 ### Local (No Database)

@@ -4,138 +4,889 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>VideoClipse</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* ═══════════════════════════════════════════════════════════════
+   SUPABASE DESIGN SYSTEM — VideoClipse
+   Single emerald on white · Typography at weight 500 ·
+   Square 6px buttons · Near-black on green · White canvas
+   ═══════════════════════════════════════════════════════════════ */
+
 :root {
-  --bg-sidebar:#0f0f13;--bg-main:#f5f5f7;--bg-card:#fff;
-  --primary:#3ecf8e;--primary-deep:#2db87a;--primary-soft:rgba(62,207,142,0.12);
-  --primary-glow:rgba(62,207,142,0.25);
-  --ink:#0d0d0d;--ink-mute:#6b6b6b;--ink-faint:#a1a1a1;
-  --ink-on-dark:#e8e8e8;--ink-mute-dark:#8a8a8a;
-  --hairline:rgba(0,0,0,0.06);--hairline-dark:rgba(255,255,255,0.08);
-  --radius-sm:6px;--radius-md:10px;--radius-lg:14px;
-  --shadow-card:0 1px 3px rgba(0,0,0,0.04),0 1px 2px rgba(0,0,0,0.03);
-  --shadow-hover:0 4px 12px rgba(0,0,0,0.06),0 1px 3px rgba(0,0,0,0.04);
-  --sidebar-width:240px;--transition:0.2s cubic-bezier(0.4,0,0.2,1);
+  /* ── Brand & Accent ─────────────────────────────────── */
+  --primary:            #3ecf8e;
+  --primary-deep:       #24b47e;
+  --primary-soft:       rgba(62, 207, 142, 0.12);
+
+  /* ── Surface ────────────────────────────────────────── */
+  --canvas:             #ffffff;
+  --canvas-soft:        #fafafa;
+  --canvas-night:       #1c1c1c;
+  --canvas-night-soft:  #202020;
+
+  /* ── Hairlines (grey ladder) ────────────────────────── */
+  --hairline:           #dfdfdf;
+  --hairline-strong:    #c7c7c7;
+  --hairline-cool:      #ededed;
+
+
+  /* ── Text ───────────────────────────────────────────── */
+  --ink:                #171717;
+  --ink-secondary:      #212121;
+  --ink-mute:           #707070;
+  --ink-mute2:          #9a9a9a;
+  --ink-faint:          #b2b2b2;
+  --on-primary:         #171717;
+  --on-dark:            #ffffff;
+
+  /* ── Typography (Inter as Circular substitute) ──────── */
+  --display-xxl: clamp(36px, 5vw, 64px);
+  --display-xl:  clamp(32px, 4vw, 48px);
+  --display-lg:  clamp(28px, 3vw, 36px);
+  --display-md:  clamp(24px, 2.5vw, 28px);
+  --heading-lg:  22px;
+  --heading-md:  18px;
+  --body-lg:     18px;
+  --body-md:     16px;
+  --button-md:   14px;
+  --caption:     13px;
+  --micro:       12px;
+  --code:        14px;
+
+  /* ── Spacing (8px base) ─────────────────────────────── */
+  --sp-xxs: 2px;
+  --sp-xs:  4px;
+  --sp-sm:  8px;
+  --sp-md:  12px;
+  --sp-lg:  16px;
+  --sp-xl:  24px;
+  --sp-xxl: 32px;
+  --sp-huge:64px;
+
+  /* ── Radii (square-ish, never pill) ─────────────────── */
+  --r-xs:   4px;
+  --r-sm:   6px;
+  --r-md:   8px;
+  --r-lg:   12px;
+  --r-full: 9999px;
+
+  /* ── Elevation ──────────────────────────────────────── */
+  --shadow-0:  none;
+  --shadow-1:  0 1px 3px rgba(0,0,0,0.06);
+  --shadow-2:  0 8px 24px rgba(0,0,0,0.08);
+  --shadow-3:  0 16px 48px rgba(0,0,0,0.12);
+
+  --sidebar-width: 240px;
+  --content-max:   1280px;
+  --transition:    0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{background:var(--bg-main);font-family:'Inter','Helvetica Neue',sans-serif;color:var(--ink);height:100%}
-body{display:flex}
-a{color:var(--primary);text-decoration:none}
-button{cursor:pointer;font-family:'Inter',sans-serif;font-weight:500;font-size:14px;border:none;border-radius:var(--radius-sm);padding:8px 18px;transition:all var(--transition);line-height:1.4}
-button:disabled{opacity:0.4;cursor:not-allowed}
-.btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary-deep));color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,0.05)}
-.btn-primary:hover{box-shadow:0 4px 12px var(--primary-glow);transform:translateY(-1px)}
-.btn-secondary{background:var(--bg-card);color:var(--ink);border:1px solid var(--hairline);box-shadow:var(--shadow-card)}
-.btn-secondary:hover{border-color:var(--primary);box-shadow:var(--shadow-hover)}
-.btn-ghost{background:transparent;color:var(--ink-mute);padding:8px 12px}
-.btn-ghost:hover{background:var(--bg-card)}
-.btn-danger{background:rgba(239,68,68,0.1);color:#ef4444}
-.btn-danger:hover{background:rgba(239,68,68,0.2)}
-input,select,textarea{border-radius:var(--radius-sm);border:1px solid var(--hairline);font-family:'Inter',sans-serif;font-size:15px;color:var(--ink);background:var(--bg-card);padding:8px 12px;outline:none;width:100%;transition:border-color var(--transition),box-shadow var(--transition)}
-input:focus,select:focus,textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
-label{font-size:13px;font-weight:500;color:var(--ink-mute);margin-bottom:4px;display:block}
-hr{border:none;border-top:1px solid var(--hairline);margin:16px 0}
 
-/* Layout */
-.sidebar{width:var(--sidebar-width);background:var(--bg-sidebar);height:100vh;overflow-y:auto;padding:24px 16px;display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0}
-.sidebar::-webkit-scrollbar{width:0}
-.sidebar-logo{display:flex;align-items:center;gap:12px;padding:0 8px 24px 8px;border-bottom:1px solid var(--hairline-dark);margin-bottom:20px}
-.sidebar-logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--primary),var(--primary-deep));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;box-shadow:0 2px 8px var(--primary-glow)}
-.sidebar-logo-text{font-weight:700;font-size:18px;letter-spacing:-0.5px;color:#fff;line-height:1.2}
-.sidebar-logo-sub{font-size:10px;color:var(--ink-mute-dark);letter-spacing:0.5px;text-transform:uppercase}
-.nav-item{display:flex;align-items:center;gap:10px;padding:10px 14px;margin-bottom:2px;border-radius:var(--radius-md);font-size:14px;font-weight:500;color:var(--ink-mute-dark);background:transparent;border:none;width:100%;text-align:left;transition:all var(--transition)}
-.nav-item:hover{background:rgba(255,255,255,0.06);color:var(--ink-on-dark)}
-.nav-item.active{background:var(--primary-soft);color:var(--primary);font-weight:600}
-.sidebar-accounts{margin-top:auto;padding-top:16px;border-top:1px solid var(--hairline-dark)}
-.sidebar-account-row{display:flex;align-items:center;gap:8px;padding:6px 8px;font-size:12px;color:var(--ink-mute-dark)}
-.sidebar-account-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.sidebar-footer{margin-top:16px;padding:12px 8px 0;border-top:1px solid var(--hairline-dark);font-size:10px;color:var(--ink-mute-dark);line-height:1.5}
-.sidebar-model{margin:12px 0 8px 8px}
-.sidebar-model label{font-size:12px;font-weight:600;color:var(--ink-mute-dark)}
-.sidebar-model select{font-size:13px;padding:6px 8px;background:rgba(255,255,255,0.05);color:var(--ink-on-dark);border-color:var(--hairline-dark)}
+/* ── Base Reset ────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+html, body {
+  background: var(--canvas);
+  font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  color: var(--ink);
+  height: 100%;
+}
+body { display: flex; }
+a {
+  color: var(--ink);
+  text-decoration: underline;
+  transition: color var(--transition);
+}
+a:hover { color: var(--primary); }
+img { max-width: 100%; height: auto; }
+hr {
+  border: none;
+  border-top: 1px solid var(--hairline);
+  margin: var(--sp-lg) 0;
+}
 
-.main{flex:1;overflow-y:auto;padding:32px 24px;max-width:860px}
-.page-header{font-size:28px;font-weight:700;letter-spacing:-0.6px;margin:0 0 4px 0;line-height:1.2}
-.page-sub{font-size:14px;color:var(--ink-mute);margin:0 0 28px 0;line-height:1.4}
+/* ── Typography Utility Classes ─────────────────────────────── */
+.display-xxl {
+  font-size: var(--display-xxl);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -1.92px;
+}
+.display-xl {
+  font-size: var(--display-xl);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -1.44px;
+}
+.display-lg {
+  font-size: var(--display-lg);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: -0.72px;
+}
+.display-md {
+  font-size: var(--display-md);
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.42px;
+}
+.heading-lg {
+  font-size: var(--heading-lg);
+  font-weight: 500;
+  line-height: 1.2;
+}
+.heading-md {
+  font-size: var(--heading-md);
+  font-weight: 500;
+  line-height: 1.4;
+}
+.body-lg {
+  font-size: var(--body-lg);
+  font-weight: 400;
+  line-height: 1.55;
+}
+.body-md {
+  font-size: var(--body-md);
+  font-weight: 400;
+  line-height: 1.5;
+}
+.caption {
+  font-size: var(--caption);
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--ink-mute);
+}
+.micro {
+  font-size: var(--micro);
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--ink-mute);
+}
+code, .code {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--code);
+  font-weight: 400;
+  line-height: 1.5;
+}
 
-/* Cards */
-.card{background:var(--bg-card);border:1px solid var(--hairline);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px;box-shadow:var(--shadow-card);transition:box-shadow var(--transition),border-color var(--transition)}
-.card:hover{box-shadow:var(--shadow-hover);border-color:rgba(0,0,0,0.1)}
-.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:28px}
-.dash-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:20px;text-align:center;border:1px solid var(--hairline);box-shadow:var(--shadow-card);transition:transform var(--transition),box-shadow var(--transition)}
-.dash-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover)}
-.dash-num{font-size:34px;font-weight:700;color:var(--primary);margin:0;line-height:1}
-.dash-num-dark{color:var(--ink)}
-.dash-label{font-size:12px;color:var(--ink-mute);margin:6px 0 0 0;font-weight:500}
-.dash-icon{font-size:24px;margin-bottom:8px}
+/* ── Page Header ────────────────────────────────────────────── */
+.page-header {
+  font-size: var(--display-xl);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -1.44px;
+  color: var(--ink);
+  margin: 0 0 var(--sp-xs) 0;
+}
+.page-sub {
+  font-size: var(--body-md);
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--ink-mute);
+  margin: 0 0 var(--sp-xxl) 0;
+}
 
-/* Step bar */
-.step-bar{display:flex;align-items:center;gap:8px;margin-bottom:24px;padding:16px;background:var(--bg-card);border-radius:var(--radius-lg);border:1px solid var(--hairline);flex-wrap:wrap}
-.step-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-faint);transition:color var(--transition)}
-.step-item.active{color:var(--ink);font-weight:600}
-.step-item.done{color:var(--primary)}
-.step-dot{width:6px;height:6px;border-radius:50%;background:var(--hairline);flex-shrink:0;transition:background var(--transition)}
-.step-item.active .step-dot,.step-item.done .step-dot{background:var(--primary)}
-.step-line{width:20px;height:1px;background:var(--hairline);flex-shrink:0}
+/* ═══════════════════════════════════════════════════════════════
+   SIDEBAR — Dark developer pane (functional, not marketing)
+   ═══════════════════════════════════════════════════════════════ */
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--canvas-night);
+  height: 100vh;
+  overflow-y: auto;
+  padding: var(--sp-xl) var(--sp-lg);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+}
+.sidebar::-webkit-scrollbar { width: 0; }
 
-/* Queue & moment cards */
-.queue-card,.moment-card{background:var(--bg-card);border:1px solid var(--hairline);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:10px;box-shadow:var(--shadow-card);transition:all var(--transition)}
-.moment-card:hover,.queue-card:hover{border-color:var(--primary);box-shadow:var(--shadow-hover)}
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-md);
+  padding: 0 var(--sp-sm) var(--sp-xl) var(--sp-sm);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: var(--sp-xl);
+}
+.sidebar-logo-icon {
+  width: 32px; height: 32px;
+  background: var(--primary);
+  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.sidebar-logo-text {
+  font-weight: 500;
+  font-size: 18px;
+  letter-spacing: -0.42px;
+  color: var(--on-dark);
+  line-height: 1.2;
+}
+.sidebar-logo-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.4);
+  letter-spacing: 0.5px;
+}
 
-/* Tabs */
-.tabs{display:flex;gap:0;border-bottom:1px solid var(--hairline);margin-bottom:16px}
-.tab{padding:10px 16px;font-size:13px;font-weight:500;color:var(--ink-mute);background:transparent;border:none;border-bottom:2px solid transparent;transition:all var(--transition)}
-.tab:hover{color:var(--ink)}
-.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 2px;
+  border-radius: var(--r-sm);
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.55);
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: 'Inter', sans-serif;
+}
+.nav-item:hover {
+  background: rgba(255,255,255,0.04);
+  color: var(--on-dark);
+}
+.nav-item.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-weight: 500;
+}
 
-/* Badge */
-.badge{display:inline-block;padding:2px 10px;border-radius:9999px;font-size:11px;font-weight:600;letter-spacing:0.3px}
-.badge-green{background:var(--primary-soft);color:var(--primary-deep)}
-.badge-gray{background:var(--bg-main);color:var(--ink-mute)}
-.badge-red{background:rgba(239,68,68,0.1);color:#ef4444}
-.badge-blue{background:rgba(59,130,246,0.1);color:#3b82f6}
+.sidebar-accounts {
+  margin-top: auto;
+  padding-top: var(--sp-lg);
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+.sidebar-account-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.4);
+}
+.sidebar-account-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 
-/* Grid helpers */
-.row{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap}
-.col{flex:1;min-width:0}
-.col-3{flex:1;min-width:120px}
-.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:12px}
-.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px}
+.sidebar-footer {
+  margin-top: var(--sp-lg);
+  padding: var(--sp-md) var(--sp-sm) 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  font-size: 10px;
+  color: rgba(255,255,255,0.3);
+  line-height: 1.5;
+}
 
-/* Progress */
-.progress{height:6px;background:var(--hairline);border-radius:3px;overflow:hidden;margin:12px 0}
-.progress-bar{height:100%;background:linear-gradient(90deg,var(--primary),var(--primary-deep));border-radius:3px;transition:width 0.3s}
+.sidebar-model { margin: var(--sp-md) 0 var(--sp-sm) var(--sp-sm); }
+.sidebar-model label {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255,255,255,0.4);
+  display: block;
+  margin-bottom: 4px;
+}
+.sidebar-model select {
+  font-size: 13px;
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.05);
+  color: var(--on-dark);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--r-xs);
+  width: 100%;
+  font-family: 'Inter', sans-serif;
+  outline: none;
+}
+.sidebar-model select:focus {
+  border-color: var(--primary);
+}
 
-/* Skeleton */
-@keyframes skeleton-loading{0%{background-position:-200px 0}100%{background-position:calc(200px+100%) 0}}
-.skeleton{background:linear-gradient(90deg,var(--hairline) 25%,rgba(0,0,0,0.04) 50%,var(--hairline) 75%);background-size:200px 100%;animation:skeleton-loading 1.5s ease-in-out infinite;border-radius:var(--radius-sm);height:16px;margin-bottom:8px}
+/* ═══════════════════════════════════════════════════════════════
+   MAIN CONTENT — White canvas
+   ═══════════════════════════════════════════════════════════════ */
+.main {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-xxl) var(--sp-xl);
+  max-width: var(--content-max);
+  margin: 0 auto;
+  width: 100%;
+}
 
-/* Toast */
-.toast{position:fixed;bottom:24px;right:24px;background:var(--ink);color:#fff;padding:12px 20px;border-radius:var(--radius-md);font-size:13px;z-index:999;animation:fadeIn 0.3s}
-@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+/* ═══════════════════════════════════════════════════════════════
+   BUTTONS — Supabase signature: 6px radius, near-black on emerald
+   ═══════════════════════════════════════════════════════════════ */
+h1, h2, h3, h4, h5, h6 { font-weight: 500; }
 
-/* Checkbox slider */
-.checkbox-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
-.checkbox-row input[type="checkbox"]{width:auto}
-.checkbox-row label{margin:0;cursor:pointer}
-.radio-group{display:flex;gap:16px;margin:8px 0}
-.radio-group label{font-size:13px;color:var(--ink);display:flex;align-items:center;gap:4px;cursor:pointer}
+button {
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: var(--button-md);
+  border: none;
+  border-radius: var(--r-sm);
+  padding: var(--sp-sm) var(--sp-lg);
+  min-height: 36px;
+  transition: all var(--transition);
+  line-height: 1.4;
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
-.form-group{margin-bottom:12px}
-.form-group label{font-size:13px;font-weight:500;color:var(--ink-mute);margin-bottom:4px}
+.btn-primary {
+  background: var(--primary);
+  color: var(--on-primary);  /* near-black, NOT white */
+  box-shadow: var(--shadow-1);
+}
+.btn-primary:hover {
+  background: var(--primary-deep);
+  box-shadow: var(--shadow-2);
+  transform: translateY(-1px);
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
 
-video{border-radius:var(--radius-lg);border:1px solid var(--hairline);max-width:100%}
-.empty-state{text-align:center;padding:40px;color:var(--ink-faint)}
-.empty-state p{font-size:14px;margin-top:8px}
+.btn-secondary {
+  background: var(--canvas);
+  color: var(--ink);
+  border: 1px solid var(--hairline-strong);
+  box-shadow: var(--shadow-1);
+}
+.btn-secondary:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-2);
+}
 
-@media(max-width:640px){
-  .sidebar{width:60px;padding:16px 8px}
-  .sidebar-logo-text,.sidebar-logo-sub,.nav-item span,.sidebar-accounts,.sidebar-footer,.sidebar-model{display:none}
-  .nav-item{justify-content:center;padding:10px}
-  .main{padding:20px 16px}
-  .dash-grid{grid-template-columns:1fr 1fr}
-  .grid-3,.grid-2{grid-template-columns:1fr}
+.btn-ghost {
+  background: transparent;
+  color: var(--ink-mute);
+  padding: var(--sp-sm) var(--sp-md);
+}
+.btn-ghost:hover {
+  background: var(--canvas-soft);
+  color: var(--ink);
+}
+
+.btn-danger {
+  background: rgba(239,68,68,0.08);
+  color: #ef4444;
+}
+.btn-danger:hover {
+  background: rgba(239,68,68,0.15);
+}
+
+.btn-link {
+  background: transparent;
+  color: var(--ink);
+  padding: 0;
+  text-decoration: underline;
+  font-size: var(--button-md);
+}
+.btn-link:hover { color: var(--primary); }
+
+.btn-dark {
+  background: var(--canvas-night);
+  color: var(--on-dark);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.btn-dark:hover {
+  background: var(--canvas-night-soft);
+  border-color: var(--primary);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INPUTS & FORMS
+   ═══════════════════════════════════════════════════════════════ */
+input, select, textarea {
+  border-radius: var(--r-sm);
+  border: 1px solid var(--hairline);
+  font-family: 'Inter', sans-serif;
+  font-size: var(--body-md);
+  font-weight: 400;
+  color: var(--ink);
+  background: var(--canvas);
+  padding: var(--sp-sm) var(--sp-md);
+  outline: none;
+  width: 100%;
+  transition: border-color var(--transition), box-shadow var(--transition);
+  min-height: 36px;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+input::placeholder, textarea::placeholder {
+  color: var(--ink-faint);
+}
+label {
+  font-size: var(--caption);
+  font-weight: 500;
+  color: var(--ink-mute);
+  margin-bottom: var(--sp-xs);
+  display: block;
+}
+textarea { resize: vertical; }
+
+/* ═══════════════════════════════════════════════════════════════
+   CARDS & CONTAINERS
+   ═══════════════════════════════════════════════════════════════ */
+.card {
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  padding: var(--sp-xxl);
+  margin-bottom: var(--sp-md);
+  box-shadow: var(--shadow-1);
+  transition: box-shadow var(--transition), border-color var(--transition);
+}
+.card:hover {
+  box-shadow: var(--shadow-2);
+  border-color: var(--hairline-strong);
+}
+
+.card-night {
+  background: var(--canvas-night);
+  color: var(--on-dark);
+  border: none;
+  border-radius: var(--r-lg);
+  padding: var(--sp-xxl);
+  margin-bottom: var(--sp-md);
+  box-shadow: var(--shadow-2);
+}
+
+.card-flat {
+  background: transparent;
+  border: none;
+  padding: 0;
+  box-shadow: none;
+}
+
+.queue-card, .moment-card {
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  padding: var(--sp-lg) var(--sp-xl);
+  margin-bottom: 8px;
+  box-shadow: var(--shadow-1);
+  transition: all var(--transition);
+}
+.queue-card:hover, .moment-card:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-2);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DASHBOARD GRID — Stats cards
+   ═══════════════════════════════════════════════════════════════ */
+.dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--sp-md);
+  margin-bottom: var(--sp-xxl);
+}
+.dash-card {
+  background: var(--canvas);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  padding: var(--sp-xxl);
+  text-align: center;
+  box-shadow: var(--shadow-1);
+  transition: transform var(--transition), box-shadow var(--transition);
+}
+.dash-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+}
+.dash-num {
+  font-size: 34px;
+  font-weight: 500;
+  color: var(--primary);
+  margin: 0;
+  line-height: 1;
+  letter-spacing: -0.72px;
+}
+.dash-num-dark { color: var(--ink); }
+.dash-label {
+  font-size: var(--caption);
+  font-weight: 500;
+  color: var(--ink-mute);
+  margin: var(--sp-sm) 0 0 0;
+}
+.dash-icon {
+  font-size: 24px;
+  margin-bottom: var(--sp-sm);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STEP BAR — Workflow indicator
+   ═══════════════════════════════════════════════════════════════ */
+.step-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  margin-bottom: var(--sp-xl);
+  padding: var(--sp-lg) var(--sp-xl);
+  background: var(--canvas-soft);
+  border: 1px solid var(--hairline-cool);
+  border-radius: var(--r-lg);
+  flex-wrap: wrap;
+}
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--caption);
+  font-weight: 400;
+  color: var(--ink-faint);
+  transition: color var(--transition);
+}
+.step-item.active {
+  color: var(--ink);
+  font-weight: 500;
+}
+.step-item.done { color: var(--primary); }
+.step-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--hairline);
+  flex-shrink: 0;
+  transition: background var(--transition);
+}
+.step-item.active .step-dot,
+.step-item.done .step-dot { background: var(--primary); }
+.step-line {
+  width: 20px;
+  height: 1px;
+  background: var(--hairline);
+  flex-shrink: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TABS — Underlined only
+   ═══════════════════════════════════════════════════════════════ */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--hairline);
+  margin-bottom: var(--sp-lg);
+}
+.tab {
+  padding: 10px 16px;
+  font-size: var(--button-md);
+  font-weight: 500;
+  color: var(--ink-mute2);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: 'Inter', sans-serif;
+}
+.tab:hover { color: var(--ink); }
+.tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BADGES & PILLS
+   ═══════════════════════════════════════════════════════════════ */
+.badge {
+  display: inline-block;
+  padding: var(--sp-xxs) 10px;
+  border-radius: var(--r-full);
+  font-size: var(--micro);
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+.badge-green {
+  background: var(--primary-soft);
+  color: var(--primary-deep);
+}
+.badge-gray {
+  background: var(--canvas-soft);
+  color: var(--ink-mute);
+}
+.badge-red {
+  background: rgba(239,68,68,0.08);
+  color: #ef4444;
+}
+.badge-blue {
+  background: rgba(59,130,246,0.08);
+  color: #3b82f6;
+}
+
+.pill-tag {
+  display: inline-block;
+  padding: var(--sp-xxs) var(--sp-sm);
+  border-radius: var(--r-full);
+  font-size: var(--micro);
+  font-weight: 400;
+}
+.pill-tag-green {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.pill-tag-soft {
+  background: var(--canvas-soft);
+  color: var(--ink);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CODE BLOCKS
+   ═══════════════════════════════════════════════════════════════ */
+.code-block {
+  background: var(--canvas-night);
+  color: var(--on-dark);
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-size: var(--code);
+  padding: var(--sp-lg);
+  border-radius: var(--r-sm);
+  overflow-x: auto;
+  line-height: 1.6;
+}
+code, .inline-code {
+  font-family: 'JetBrains Mono', ui-monospace, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875em;
+  background: var(--canvas-soft);
+  border: 1px solid var(--hairline-cool);
+  border-radius: var(--r-xs);
+  padding: 1px 5px;
+  color: var(--ink);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   GRID HELPERS
+   ═══════════════════════════════════════════════════════════════ */
+.row { display: flex; gap: var(--sp-md); margin-bottom: var(--sp-md); flex-wrap: wrap; }
+.col { flex: 1; min-width: 0; }
+.col-3 { flex: 1; min-width: 120px; }
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-md);
+  margin-bottom: var(--sp-md);
+}
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--sp-md);
+  margin-bottom: var(--sp-md);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PROGRESS BAR
+   ═══════════════════════════════════════════════════════════════ */
+.progress {
+  height: 6px;
+  background: var(--hairline-cool);
+  border-radius: var(--r-xs);
+  overflow: hidden;
+  margin: var(--sp-md) 0;
+}
+.progress-bar {
+  height: 100%;
+  background: var(--primary);
+  border-radius: var(--r-xs);
+  transition: width 0.3s;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SKELETON LOADING
+   ═══════════════════════════════════════════════════════════════ */
+@keyframes skeleton-loading {
+  0% { background-position: -200px 0; }
+  100% { background-position: calc(200px + 100%) 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--hairline-cool) 25%, rgba(0,0,0,0.03) 50%, var(--hairline-cool) 75%);
+  background-size: 200px 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: var(--r-xs);
+  height: 16px;
+  margin-bottom: 8px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   TOAST / NOTIFICATIONS
+   ═══════════════════════════════════════════════════════════════ */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--canvas-night);
+  color: var(--on-dark);
+  padding: var(--sp-md) var(--sp-xl);
+  border-radius: var(--r-md);
+  font-size: var(--caption);
+  z-index: 999;
+  animation: fadeIn 0.3s;
+  box-shadow: var(--shadow-3);
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CHECKBOX / RADIO
+   ═══════════════════════════════════════════════════════════════ */
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-sm);
+  margin-bottom: 6px;
+}
+.checkbox-row input[type="checkbox"] {
+  width: auto;
+  min-height: auto;
+  accent-color: var(--primary);
+}
+.checkbox-row label {
+  margin: 0;
+  cursor: pointer;
+  font-size: var(--body-md);
+  color: var(--ink);
+  font-weight: 400;
+}
+.radio-group {
+  display: flex;
+  gap: var(--sp-lg);
+  margin: var(--sp-sm) 0;
+}
+.radio-group label {
+  font-size: var(--body-md);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  cursor: pointer;
+  font-weight: 400;
+}
+.radio-group input[type="radio"] {
+  width: auto;
+  min-height: auto;
+  accent-color: var(--primary);
+}
+
+.form-group { margin-bottom: var(--sp-md); }
+
+/* ═══════════════════════════════════════════════════════════════
+   VIDEO
+   ═══════════════════════════════════════════════════════════════ */
+video {
+  border-radius: var(--r-lg);
+  border: 1px solid var(--hairline);
+  max-width: 100%;
+  box-shadow: var(--shadow-1);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   EMPTY STATE
+   ═══════════════════════════════════════════════════════════════ */
+.empty-state {
+  text-align: center;
+  padding: var(--sp-huge) var(--sp-xl);
+  color: var(--ink-faint);
+}
+.empty-state p {
+  font-size: var(--body-md);
+  margin-top: var(--sp-sm);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DETAILS / SUMMARY (Collapsible)
+   ═══════════════════════════════════════════════════════════════ */
+details {
+  margin-bottom: var(--sp-lg);
+}
+summary {
+  font-weight: 500;
+  font-size: var(--heading-md);
+  cursor: pointer;
+  margin-bottom: var(--sp-md);
+  color: var(--ink);
+  user-select: none;
+}
+summary:hover { color: var(--ink-mute); }
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGINATION
+   ═══════════════════════════════════════════════════════════════ */
+.pagination {
+  text-align: center;
+  font-size: var(--caption);
+  color: var(--ink-mute);
+  margin: var(--sp-md) 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+  .sidebar {
+    width: 60px;
+    padding: var(--sp-lg) var(--sp-sm);
+  }
+  .sidebar-logo-text,
+  .sidebar-logo-sub,
+  .nav-item span:last-child,
+  .sidebar-accounts,
+  .sidebar-footer,
+  .sidebar-model { display: none; }
+  .nav-item { justify-content: center; padding: 10px; font-size: 0; }
+  .nav-item span:first-child { font-size: 18px; }
+  .sidebar-logo { padding-bottom: var(--sp-sm); }
+  .sidebar-logo-icon { width: 28px; height: 28px; font-size: 16px; }
+
+  .main {
+    padding: var(--sp-lg) var(--sp-md);
+    max-width: 100%;
+  }
+
+  .dash-grid { grid-template-columns: 1fr 1fr; }
+  .grid-3, .grid-2 { grid-template-columns: 1fr; }
+
+  .page-header {
+    letter-spacing: -0.72px;
+  }
+
+  .step-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--sp-sm);
+  }
+  .step-line { display: none; }
+
+  .card, .card-night {
+    padding: var(--sp-lg);
+  }
+}
+
+@media (max-width: 480px) {
+  .dash-grid { grid-template-columns: 1fr; }
+  .row { flex-direction: column; }
 }
 </style>
 </head>
@@ -154,6 +905,7 @@ video{border-radius:var(--radius-lg);border:1px solid var(--hairline);max-width:
   <button class="nav-item" data-page="schedule"><span>📅</span><span>Schedule</span></button>
   <button class="nav-item" data-page="accounts"><span>👤</span><span>Accounts</span></button>
   <button class="nav-item" data-page="stats"><span>📈</span><span>Stats</span></button>
+  <button class="nav-item" data-page="templates"><span>🎨</span><span>Templates</span></button>
   <div class="sidebar-model">
     <label>Ollama Model</label>
     <select id="ollamaModel">
@@ -161,7 +913,7 @@ video{border-radius:var(--radius-lg);border:1px solid var(--hairline);max-width:
       <option>qwen2.5-coder:1.5b</option>
       <option>Custom</option>
     </select>
-    <input type="text" id="customModel" placeholder="Nama model custom" style="display:none;margin-top:4px;font-size:12px;padding:4px 6px">
+    <input type="text" id="customModel" placeholder="Nama model custom" style="display:none;margin-top:4px;font-size:12px;padding:4px 6px;border-radius:4px;background:rgba(255,255,255,0.05);color:#fff;border:1px solid rgba(255,255,255,0.08);width:100%">
   </div>
   <div class="sidebar-accounts" id="sidebarAccounts"></div>
   <div class="sidebar-footer">VideoClipse v6 · Offline · No API key</div>
@@ -217,6 +969,7 @@ function render() {
     schedule: renderSchedule,
     accounts: renderAccounts,
     stats: renderStats,
+    templates: renderTemplates,
     process: renderProcess,
     curate: renderCurate,
     editor: renderEditor,
@@ -233,7 +986,7 @@ async function updateSidebarAccounts() {
     const accts = await api('GET', '/api/accounts');
     const container = qs('#sidebarAccounts');
     container.innerHTML = Object.entries(accts).map(([k,v]) =>
-      `<div class="sidebar-account-row"><span class="sidebar-account-dot" style="background:${v.status==='connected'?'#3ecf8e':'#5a5a5a'}"></span> ${k.charAt(0).toUpperCase()+k.slice(1)}</div>`
+      `<div class="sidebar-account-row"><span class="sidebar-account-dot" style="background:${v.status==='connected'?'#3ecf8e':'rgba(255,255,255,0.15)'}"></span> ${k.charAt(0).toUpperCase()+k.slice(1)}</div>`
     ).join('');
   } catch(e) {}
 }
@@ -242,11 +995,15 @@ async function updateSidebarAccounts() {
 async function renderDashboard() {
   const app = qs('#app');
   try {
-    const stats = await api('GET', '/api/stats');
+    const [stats, gpu, templates] = await Promise.all([
+      api('GET', '/api/stats'),
+      api('GET', '/api/gpu'),
+      api('GET', '/api/templates'),
+    ]);
     const recent = await api('GET', '/api/recent-clips?limit=3');
     app.innerHTML = `
       <div class="row" style="align-items:center;justify-content:space-between">
-        <h1 class="page-header" style="margin:0">Dashboard</h1>
+        <h1 class="page-header">Dashboard</h1>
         <button class="btn-primary" onclick="goPage('new_clip')">+ New Clip</button>
       </div>
       <div class="dash-grid">
@@ -254,23 +1011,27 @@ async function renderDashboard() {
         <div class="dash-card"><div class="dash-icon">⏳</div><p class="dash-num dash-num-dark">${stats.remaining}</p><p class="dash-label">Remaining Today</p></div>
         <div class="dash-card"><div class="dash-icon">📋</div><p class="dash-num dash-num-dark">${stats.in_queue}</p><p class="dash-label">In Queue</p></div>
         <div class="dash-card"><div class="dash-icon">🎬</div><p class="dash-num dash-num-dark">${stats.total_clips}</p><p class="dash-label">Total Clips</p></div>
-      </div>
-      <p style="font-size:13px;font-weight:600;color:var(--ink-mute);margin-bottom:10px">Quick Actions</p>
+      </div>        <div style="display:flex;gap:var(--sp-sm);margin-bottom:var(--sp-md);flex-wrap:wrap">
+          <span class="badge ${gpu.cuda ? 'badge-green' : 'badge-gray'}">${gpu.cuda ? '🚀 GPU: ' + (gpu.gpu_name||'CUDA') : '💻 CPU Mode'}</span>
+          ${gpu.nvenc ? '<span class="badge badge-green">🎬 NVENC</span>' : ''}
+          <span class="badge badge-blue">⚡ Whisper: ${gpu.device||'cpu'}</span>
+        </div>
+        <p class="heading-md" style="margin-bottom:var(--sp-md);color:var(--ink-mute)">Quick Actions</p>
       <div class="grid-3">
-        <button class="btn-primary" style="padding:16px;font-size:13px" onclick="goPage('new_clip')">🔗 Create from Link</button>
-        <button class="btn-secondary" style="padding:16px;font-size:13px" onclick="goPage('new_clip')">📁 Upload Local</button>
-        <button class="btn-secondary" style="padding:16px;font-size:13px" onclick="goPage('new_clip')">🌾 Farm Mode</button>
+        <button class="btn-primary" style="padding:var(--sp-lg);font-size:var(--button-md)" onclick="goPage('new_clip')">🔗 Create from Link</button>
+        <button class="btn-secondary" style="padding:var(--sp-lg);font-size:var(--button-md)" onclick="goPage('new_clip')">📁 Upload Local</button>
+        <button class="btn-secondary" style="padding:var(--sp-lg);font-size:var(--button-md)" onclick="goPage('new_clip')">🌾 Farm Mode</button>
       </div>
       ${recent.items && recent.items.length ? `
-        <p style="font-size:13px;font-weight:600;color:var(--ink-mute);margin:20px 0 10px">Recent Clips</p>
+        <p class="heading-md" style="margin:var(--sp-xxl) 0 var(--sp-md);color:var(--ink-mute)">Recent Clips</p>
         ${recent.items.map(v => `
           <div class="queue-card" style="display:flex;justify-content:space-between;align-items:center">
-            <div><div style="font-weight:500;font-size:14px">${v.name}</div><div style="font-size:12px;color:var(--ink-mute)">${v.size_mb} MB · ${v.mtime}</div></div>
+            <div><div style="font-weight:500;font-size:15px">${v.name}</div><div style="font-size:13px;color:var(--ink-mute);margin-top:2px">${v.size_mb} MB · ${v.mtime}</div></div>
           </div>
         `).join('')}
       ` : ''}
     `;
-  } catch(e) { app.innerHTML = `<p>Error loading dashboard: ${e.message}</p>` }
+  } catch(e) { app.innerHTML = `<p style="color:#ef4444">Error loading dashboard: ${e.message}</p>`; }
 }
 
 // ── New Clip ───────────────────────────────────────────────
@@ -316,12 +1077,12 @@ function showNCTab(tab) {
     `;
     qs('#fileInput').onchange = function() {
       if (this.files[0]) {
-        qs('#fileInfo').innerHTML = `<p style="color:var(--ink-mute);font-size:13px">${this.files[0].name} (${(this.files[0].size/(1024*1024)).toFixed(1)} MB)</p>`;
+        qs('#fileInfo').innerHTML = `<p style="margin-top:var(--sp-sm);font-size:var(--body-md);color:var(--ink-mute)">${this.files[0].name} (${(this.files[0].size/(1024*1024)).toFixed(1)} MB)</p>`;
       }
     };
   } else if (tab === 'farm') {
     content.innerHTML = `
-      <p style="font-size:14px;color:var(--ink-mute);margin-bottom:16px">One link → multiple clips → scheduled upload</p>
+      <p style="font-size:var(--body-md);color:var(--ink-mute);margin-bottom:var(--sp-lg)">One link → multiple clips → scheduled upload</p>
       <div class="form-group"><input type="text" id="farmUrl" placeholder="https://youtube.com/..."></div>
       <div class="grid-3">
         <div class="form-group">
@@ -473,14 +1234,14 @@ function renderCurate() {
     div.style.cursor = 'pointer';
     div.innerHTML = `
       <div style="display:flex;align-items:center;gap:12px">
-        <div style="width:44px;height:44px;background:var(--bg-main);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${icon}</div>
+        <div style="width:44px;height:44px;background:var(--canvas-soft);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${icon}</div>
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-            <span style="font-weight:600;font-size:14px">${m.category}</span>
+            <span style="font-weight:500;font-size:15px">${m.category}</span>
             <span class="badge badge-green">${d.toFixed(0)}s</span>
           </div>
-          <p style="margin:2px 0 0;font-size:12px;color:var(--ink-mute)">${Math.floor(m.start_time/60)}:${String(Math.floor(m.start_time%60)).padStart(2,'0')} – ${Math.floor(m.end_time/60)}:${String(Math.floor(m.end_time%60)).padStart(2,'0')}</p>
-          <p style="margin:2px 0 0;font-size:12px;color:var(--ink-faint)">${m.reason}</p>
+          <p style="margin:2px 0 0;font-size:13px;color:var(--ink-mute)">${Math.floor(m.start_time/60)}:${String(Math.floor(m.start_time%60)).padStart(2,'0')} – ${Math.floor(m.end_time/60)}:${String(Math.floor(m.end_time%60)).padStart(2,'0')}</p>
+          <p style="margin:2px 0 0;font-size:13px;color:var(--ink-faint)">${m.reason}</p>
         </div>
         <button class="btn-primary" onclick="selectMoment(${i})">Select</button>
       </div>
@@ -524,10 +1285,10 @@ function renderEditor() {
         <input type="number" id="edEnd" value="${Math.min(mom.end_time, dur)}" min="0" max="${dur}" step="0.5">
       </div>
     </div>
-    <p style="font-size:13px;color:var(--ink-mute);margin-bottom:16px">Duration: <span id="edDur">${(mom.end_time - mom.start_time).toFixed(1)}</span>s</p>
+    <p style="font-size:var(--body-md);color:var(--ink-mute);margin-bottom:var(--sp-lg)">Duration: <span id="edDur">${(mom.end_time - mom.start_time).toFixed(1)}</span>s</p>
 
     <details open>
-      <summary style="font-weight:600;font-size:14px;cursor:pointer;margin-bottom:12px">Visual Adjustments & Effects</summary>
+      <summary>Visual Adjustments & Effects</summary>
       <div class="grid-3">
         <div class="form-group">
           <label>Aspect Ratio</label>
@@ -552,9 +1313,9 @@ function renderEditor() {
         </div>
       </div>
       <div class="grid-3">
-        <div class="form-group"><label>Contrast</label><input type="range" id="edContrast" min="0.5" max="2" value="1" step="0.1"></div>
-        <div class="form-group"><label>Brightness</label><input type="range" id="edBright" min="-0.5" max="0.5" value="0" step="0.05"></div>
-        <div class="form-group"><label>Saturation</label><input type="range" id="edSat" min="0" max="3" value="1" step="0.1"></div>
+        <div class="form-group"><label>Contrast</label><input type="range" id="edContrast" min="0.5" max="2" value="1" step="0.1" style="accent-color:var(--primary)"></div>
+        <div class="form-group"><label>Brightness</label><input type="range" id="edBright" min="-0.5" max="0.5" value="0" step="0.05" style="accent-color:var(--primary)"></div>
+        <div class="form-group"><label>Saturation</label><input type="range" id="edSat" min="0" max="3" value="1" step="0.1" style="accent-color:var(--primary)"></div>
       </div>
       <div class="grid-3">
         <div class="checkbox-row"><input type="checkbox" id="edVig"><label for="edVig">Vignette</label></div>
@@ -565,7 +1326,7 @@ function renderEditor() {
         <div class="checkbox-row"><input type="checkbox" id="edSharpen"><label for="edSharpen">Sharpen</label></div>
         <div class="checkbox-row"><input type="checkbox" id="edEdge"><label for="edEdge">Edge Detect</label></div>
       </div>
-      <p style="font-size:13px;font-weight:600;margin:10px 0 2px 0">Transitions & Protection</p>
+      <p class="heading-md" style="margin-top:var(--sp-md);color:var(--ink-mute)">Transitions & Protection</p>
       <div class="grid-2">
         <div class="checkbox-row"><input type="checkbox" id="edMirror" checked><label for="edMirror">Mirror Video</label></div>
         <div class="checkbox-row"><input type="checkbox" id="edNoise" checked><label for="edNoise">Noise Reduction</label></div>
@@ -573,7 +1334,7 @@ function renderEditor() {
     </details>
 
     <details>
-      <summary style="font-weight:600;font-size:14px;cursor:pointer;margin-bottom:12px">Subtitles Styling</summary>
+      <summary>Subtitles Styling</summary>
       <div class="grid-2">
         <div class="checkbox-row"><input type="checkbox" id="edShowSub" checked><label for="edShowSub">Show Subtitles</label></div>
         <div class="form-group">
@@ -585,7 +1346,7 @@ function renderEditor() {
         </div>
       </div>
       <div class="grid-2">
-        <div class="form-group"><label>Font Size</label><input type="range" id="edSubSize" min="10" max="100" value="44" step="2"></div>
+        <div class="form-group"><label>Font Size</label><input type="range" id="edSubSize" min="10" max="100" value="44" step="2" style="accent-color:var(--primary)"></div>
         <div class="form-group"><label>Font Family</label><input type="text" id="edSubFont" value="Montserrat"></div>
       </div>
       <div class="grid-2">
@@ -605,15 +1366,55 @@ function renderEditor() {
     </details>
 
     <details>
-      <summary style="font-weight:600;font-size:14px;cursor:pointer;margin-bottom:12px">Title & Description</summary>
+      <summary>Title & Description</summary>
       <div class="form-group"><label>Title</label><input type="text" id="edTitle" value="${(res.title||'').slice(0,60)}"></div>
-      <div class="form-group"><label>Description</label><textarea id="edDesc" rows="3" style="resize:vertical"></textarea></div>
-    </details>
-
-    <hr>
+      <div class="form-group"><label>Description</label><textarea id="edDesc" rows="3"></textarea></div>
+    </details>                <hr>
+    <div class="checkbox-row"><input type="checkbox" id="edSilenceRemoval" checked><label for="edSilenceRemoval">🎯 Smart Silence Removal — auto-hapus jeda/diam seperti Videotto</label></div>
+    <div class="grid-2" id="silenceOpts" style="margin-bottom:var(--sp-md)">
+      <div class="form-group">
+        <label>Noise Threshold</label>
+        <select id="edSilenceThresh">
+          <option value="-30dB">-30dB (Normal)</option>
+          <option value="-40dB">-40dB (Sensitif)</option>
+          <option value="-50dB">-50dB (Sangat Sensitif)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Min Silence (s)</label>
+        <input type="number" id="edSilenceMin" value="0.5" min="0.1" max="3" step="0.1">
+      </div>
+    </div>
+    <div class="checkbox-row"><input type="checkbox" id="edJumpCut"><label for="edJumpCut">✂️ Smart Jump Cut — hapus bagian monoton/bosen otomatis</label></div>
     <div class="checkbox-row"><input type="checkbox" id="edAutoPost"><label for="edAutoPost">Auto-Post ke akun tertaut setelah selesai render</label></div>
-    <button class="btn-primary" style="width:100%;margin-top:12px" onclick="doRender()" id="renderBtn">Render Clip</button>
+    <button class="btn-primary" style="width:100%;margin-top:var(--sp-md)" onclick="doRender()" id="renderBtn">Render Clip</button>
+    <script>
+      qs('#edSilenceRemoval').onchange = function() {
+        qs('#silenceOpts').style.display = this.checked ? 'grid' : 'none';
+      };
+    </script>
   `;
+
+  // Load applied template from sessionStorage
+  try {
+    const tplData = sessionStorage.getItem('appliedTemplate');
+    if (tplData) {
+      const t = JSON.parse(tplData);
+      if (t.subtitle_font) qs('#edSubFont').value = t.subtitle_font;
+      if (t.subtitle_size) qs('#edSubSize').value = t.subtitle_size;
+      if (t.subtitle_color) qs('#edSubColor').value = t.subtitle_color;
+      if (t.subtitle_align) qs('#edSubAlign').value = t.subtitle_align;
+      if (t.subtitle_upper !== undefined) qs('#edSubUpper').checked = t.subtitle_upper;
+      if (t.color_preset) qs('#edColor').value = t.color_preset;
+      if (t.aspect) qs('#edAspect').value = t.aspect;
+      if (t.contrast) qs('#edContrast').value = t.contrast;
+      if (t.brightness) qs('#edBright').value = t.brightness;
+      if (t.saturation) qs('#edSat').value = t.saturation;
+      if (t.remove_silence !== undefined) qs('#edSilenceRemoval').checked = t.remove_silence;
+      sessionStorage.removeItem('appliedTemplate');
+      toast('🎨 Template applied!');
+    }
+  } catch(e) {}
 
   const st = qs('#edStart'), en = qs('#edEnd');
   function updateDur() {
@@ -659,6 +1460,11 @@ async function doRender() {
       grayscale: qs('#edGray').checked,
       sharpen: qs('#edSharpen').checked,
       edge_detect: qs('#edEdge').checked,
+      remove_silence: qs('#edSilenceRemoval').checked,
+      silence_noise_thresh: qs('#edSilenceThresh').value,
+      silence_min_dur: parseFloat(qs('#edSilenceMin').value),
+      jump_cut: qs('#edJumpCut').checked,
+      jump_cut_thresh: 0.15,
       sub_size: parseInt(qs('#edSubSize').value),
       sub_font: qs('#edSubFont').value,
       sub_align: parseInt(qs('#edSubAlign').value),
@@ -692,14 +1498,14 @@ function renderPreview() {
       <span class="step-item active"><span class="step-dot active"></span>Preview</span>
     </div>
     <video controls style="width:100%"><source src="/api/video/${ov.name}" type="video/mp4"></video>
-    <div style="margin:16px 0">
+    <div style="margin:var(--sp-lg) 0">
       <details open>
-        <summary style="font-weight:600;font-size:14px;cursor:pointer;margin-bottom:8px">Title & Description</summary>
+        <summary>Title & Description</summary>
         <div class="form-group"><label>Title</label><input type="text" id="pvTitle" value="${ov.name.replace(/\.mp4$/,'')}"></div>
-        <div class="form-group"><label>Description</label><textarea id="pvDesc" rows="3" style="resize:vertical"></textarea></div>
+        <div class="form-group"><label>Description</label><textarea id="pvDesc" rows="3"></textarea></div>
       </details>
     </div>
-    <p style="font-size:14px;font-weight:500;margin-bottom:8px">Upload to</p>
+    <p class="heading-md" style="margin-bottom:var(--sp-sm);color:var(--ink-mute)">Upload to</p>
     <div class="grid-3" id="pvUploadBtns"></div>
     <hr>
     <div class="grid-2">
@@ -716,7 +1522,7 @@ async function loadUploadButtons() {
     const accts = await api('GET', '/api/accounts');
     for (const [plat, data] of Object.entries(accts)) {
       const btn = el('button', data.status === 'connected' ? 'btn-primary' : 'btn-secondary', '');
-      btn.style.padding = '16px';
+      btn.style.padding = 'var(--sp-lg)';
       btn.disabled = data.status !== 'connected';
       btn.textContent = data.status === 'connected' ? `📤 ${plat.charAt(0).toUpperCase()+plat.slice(1)}` : `🔒 ${plat.charAt(0).toUpperCase()+plat.slice(1)}`;
       if (data.status === 'connected') {
@@ -761,7 +1567,7 @@ function deleteCurrent() {
 // ── My Clips ───────────────────────────────────────────────
 async function renderMyClips() {
   const app = qs('#app');
-  app.innerHTML = `<h1 class="page-header">My Clips</h1><p class="page-sub">Saved videos in <code>output/</code></p><div id="clipsList"></div>`;
+  app.innerHTML = `<h1 class="page-header">My Clips</h1><p class="page-sub">Saved videos in <code class="inline-code">output/</code></p><div id="clipsList"></div>`;
   try {
     const data = await api('GET', '/api/clips?page=1');
     if (!data.items.length) {
@@ -773,11 +1579,11 @@ async function renderMyClips() {
       div.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div style="flex:1;min-width:0">
-            <div style="font-weight:500;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.name}</div>
-            <div style="font-size:12px;color:var(--ink-mute);margin:2px 0">${v.size_mb} MB · ${v.mtime}</div>
+            <div style="font-weight:500;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.name}</div>
+            <div style="font-size:13px;color:var(--ink-mute);margin-top:2px">${v.size_mb} MB · ${v.mtime}</div>
           </div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:8px">
+        <div style="display:flex;gap:var(--sp-sm);margin-top:var(--sp-sm)">
           <button class="btn-secondary" style="flex:1;font-size:12px" onclick="previewClip('${v.name}')">Preview</button>
           <button class="btn-primary" style="flex:1;font-size:12px" onclick="uploadClip('${v.name}')">Upload</button>
           <button class="btn-danger" style="flex:1;font-size:12px" onclick="deleteClip('${v.name}')">Delete</button>
@@ -786,11 +1592,11 @@ async function renderMyClips() {
       qs('#clipsList').appendChild(div);
     });
     if (data.total_pages > 1) {
-      const p = el('div', '', `<p style="text-align:center;font-size:12px;color:var(--ink-mute);margin:12px 0">Page ${data.page} of ${data.total_pages}</p>`);
+      const p = el('div', '', `<p class="pagination">Page ${data.page} of ${data.total_pages}</p>`);
       qs('#clipsList').appendChild(p);
     }
   } catch(e) {
-    qs('#clipsList').innerHTML = `<p>Error: ${e.message}</p>`;
+    qs('#clipsList').innerHTML = `<p style="color:#ef4444">Error: ${e.message}</p>`;
   }
 }
 
@@ -799,7 +1605,7 @@ function previewClip(name) {
   app.innerHTML = `
     <h1 class="page-header">Preview</h1>
     <video controls style="width:100%"><source src="/api/video/${name}" type="video/mp4"></video>
-    <button class="btn-secondary" style="margin-top:12px" onclick="render()">Back</button>
+    <button class="btn-secondary" style="margin-top:var(--sp-md)" onclick="render()">Back</button>
   `;
 }
 
@@ -831,15 +1637,15 @@ async function renderQueue() {
       div.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:start">
           <div style="flex:1;min-width:0">
-            <div style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.url.slice(0,60)}</div>
-            <div style="font-size:12px;color:var(--ink-mute);margin:4px 0">
+            <div style="font-size:15px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${item.url.slice(0,60)}</div>
+            <div style="font-size:13px;color:var(--ink-mute);margin:4px 0">
               <span class="badge ${badgeCls}">${item.status}</span>
               ${(item.platforms||['youtube']).join(', ')} · ${item.schedule_at || 'unscheduled'}
             </div>
           </div>
         </div>
         ${item.status === 'pending' ? `
-          <div style="display:flex;gap:8px;margin-top:8px">
+          <div style="display:flex;gap:var(--sp-sm);margin-top:var(--sp-sm)">
             <button class="btn-secondary" style="flex:1;font-size:12px" onclick="editQueueItem(${item.id})">Edit</button>
             <button class="btn-secondary" style="flex:1;font-size:12px" onclick="skipQueueItem(${item.id})">Skip</button>
             <button class="btn-danger" style="flex:1;font-size:12px" onclick="deleteQueueItem(${item.id})">Delete</button>
@@ -850,10 +1656,11 @@ async function renderQueue() {
     });
     const clearBtn = el('button', 'btn-secondary', 'Clear Completed');
     clearBtn.style.width = '100%';
+    clearBtn.style.marginTop = 'var(--sp-sm)';
     clearBtn.onclick = async () => { await api('POST', '/api/queue/clear-done'); render(); };
     qs('#queueList').appendChild(clearBtn);
   } catch(e) {
-    qs('#queueList').innerHTML = `<p>Error: ${e.message}</p>`;
+    qs('#queueList').innerHTML = `<p style="color:#ef4444">Error: ${e.message}</p>`;
   }
 }
 
@@ -885,7 +1692,7 @@ async function renderSchedule() {
         const div = el('div', 'queue-card');
         div.innerHTML = `
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <div><div style="font-weight:500;font-size:15px">${name}</div><div style="font-size:12px;color:var(--ink-mute)">${(data.times||[]).join(', ')}</div></div>
+            <div><div style="font-weight:500;font-size:15px">${name}</div><div style="font-size:13px;color:var(--ink-mute);margin-top:2px">${(data.times||[]).join(', ')}</div></div>
             <button class="btn-danger" onclick="deleteSched('${name}')">Delete</button>
           </div>
         `;
@@ -894,14 +1701,14 @@ async function renderSchedule() {
     }
     qs('#schedList').insertAdjacentHTML('beforeend', `
       <details>
-        <summary style="font-weight:600;font-size:14px;cursor:pointer;margin:16px 0 12px">Add Schedule</summary>
+        <summary style="font-weight:500;font-size:18px;cursor:pointer;margin:var(--sp-lg) 0 var(--sp-md)">Add Schedule</summary>
         <div class="form-group"><label>Name</label><input type="text" id="schedName" value="harian"></div>
         <div class="form-group"><label>Times (comma separated)</label><input type="text" id="schedTimes" value="08:00,12:00,18:00"></div>
         <button class="btn-primary" onclick="addSched()">Save Schedule</button>
       </details>
     `);
   } catch(e) {
-    qs('#schedList').innerHTML = `<p>Error: ${e.message}</p>`;
+    qs('#schedList').innerHTML = `<p style="color:#ef4444">Error: ${e.message}</p>`;
   }
 }
 
@@ -926,16 +1733,16 @@ async function renderAccounts() {
     const accts = await api('GET', '/api/accounts');
     for (const [plat, data] of Object.entries(accts)) {
       const dot = data.status === 'connected' ? '●' : '○';
-      const clr = data.status === 'connected' ? '#3ecf8e' : '#5a5a5a';
+      const clr = data.status === 'connected' ? '#3ecf8e' : 'var(--ink-faint)';
       const div = el('div', 'queue-card');
       div.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
             <div style="font-weight:500;font-size:15px"><span style="color:${clr}">${dot}</span> ${plat.charAt(0).toUpperCase()+plat.slice(1)}</div>
-            <div style="font-size:12px;color:var(--ink-mute)">${data.status === 'connected' ? 'Connected' : 'Disconnected'} · ${data.message}</div>
+            <div style="font-size:13px;color:var(--ink-mute);margin-top:2px">${data.status === 'connected' ? 'Connected' : 'Disconnected'} · ${data.message}</div>
           </div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:8px">
+        <div style="display:flex;gap:var(--sp-sm);margin-top:var(--sp-sm)">
           <button class="btn-primary" style="flex:1" onclick="loginPlatform('${plat}')">Login ${plat.charAt(0).toUpperCase()+plat.slice(1)}</button>
           <button class="btn-danger" style="flex:1" onclick="logoutPlatform('${plat}')">Logout</button>
         </div>
@@ -945,17 +1752,17 @@ async function renderAccounts() {
     qs('#acctsList').insertAdjacentHTML('beforeend', `
       <hr>
       <details>
-        <summary style="font-weight:600;font-size:14px;cursor:pointer;margin-bottom:12px">Tempel Cookies JSON (HP / Laptop)</summary>
+        <summary style="font-weight:500;font-size:18px;cursor:pointer;margin-bottom:var(--sp-md)">Tempel Cookies JSON (HP / Laptop)</summary>
         <div class="form-group">
           <label>Platform</label>
           <select id="ckPlat"><option value="youtube">YouTube</option><option value="tiktok">TikTok</option><option value="facebook">Facebook</option></select>
         </div>
-        <div class="form-group"><label>Cookies JSON</label><textarea id="ckJson" rows="5" placeholder='[{&quot;name&quot;:&quot;...&quot;,&quot;value&quot;:&quot;...&quot;}]' style="resize:vertical"></textarea></div>
+        <div class="form-group"><label>Cookies JSON</label><textarea id="ckJson" rows="5" placeholder='[{"name":"...","value":"..."}]'></textarea></div>
         <button class="btn-primary" onclick="saveCookies()">Simpan Cookies</button>
       </details>
     `);
   } catch(e) {
-    qs('#acctsList').innerHTML = `<p>Error: ${e.message}</p>`;
+    qs('#acctsList').innerHTML = `<p style="color:#ef4444">Error: ${e.message}</p>`;
   }
 }
 
@@ -999,8 +1806,94 @@ async function renderStats() {
       </div>
     `;
   } catch(e) {
-    app.innerHTML = `<p>Error: ${e.message}</p>`;
+    app.innerHTML = `<p style="color:#ef4444">Error: ${e.message}</p>`;
   }
+}
+
+// ── Templates ──────────────────────────────────────────────
+async function renderTemplates() {
+  const app = qs('#app');
+  app.innerHTML = `
+    <h1 class="page-header">Brand Templates</h1>
+    <p class="page-sub">Simpan & terapkan pengaturan editor untuk konsistensi brand</p>
+    <div id="templatesList"></div>
+    <hr>
+    <details>
+      <summary style="font-weight:500;font-size:18px;cursor:pointer;margin-bottom:var(--sp-md)">Simpan Template Baru</summary>
+      <div class="grid-2">
+        <div class="form-group"><label>Nama Template</label><input type="text" id="tmplName" placeholder="My Brand" value="default"></div>
+        <div class="form-group"><label>Subtitle Font</label><input type="text" id="tmplFont" value="Montserrat"></div>
+      </div>
+      <div class="grid-3">
+        <div class="form-group"><label>Subtitle Size</label><input type="number" id="tmplSize" value="44"></div>
+        <div class="form-group"><label>Subtitle Color</label><select id="tmplColor"><option value="Kuning">Kuning</option><option value="Putih">Putih</option><option value="Cyan">Cyan</option><option value="Hijau">Hijau</option><option value="Merah">Merah</option><option value="Pink">Pink</option></select></div>
+        <div class="form-group"><label>Aspect Ratio</label><select id="tmplAspect"><option>Portrait 9:16 (Shorts/TikTok)</option><option>Landscape 16:9 (YouTube/FB)</option></select></div>
+      </div>
+      <button class="btn-primary" onclick="saveTemplate()">Simpan Template</button>
+    </details>
+  `;
+  loadTemplatesList();
+}
+
+async function loadTemplatesList() {
+  try {
+    const templates = await api('GET', '/api/templates');
+    const container = qs('#templatesList');
+    if (!templates.length) {
+      container.innerHTML = '<div class="empty-state">🎨<p>Belum ada template. Simpan pengaturan editor sebagai template.</p></div>';
+      return;
+    }
+    templates.forEach(t => {
+      const div = el('div', 'queue-card');
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-weight:500;font-size:15px">${t.name}</div>
+            <div style="font-size:13px;color:var(--ink-mute);margin-top:2px">${t.subtitle_font||'Montserrat'} · ${t.subtitle_color||'Kuning'} · ${t.aspect||'9:16'}</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn-secondary" onclick="applyTemplate('${t.name}')">Apply</button>
+            <button class="btn-danger" onclick="deleteTemplate('${t.name}')">Delete</button>
+          </div>
+        </div>
+      `;
+      container.appendChild(div);
+    });
+  } catch(e) {
+    qs('#templatesList').innerHTML = `<p style="color:#ef4444">Error: ${e.message}</p>`;
+  }
+}
+
+async function saveTemplate() {
+  try {
+    await api('POST', '/api/templates', {
+      name: qs('#tmplName').value,
+      subtitle_font: qs('#tmplFont').value,
+      subtitle_size: parseInt(qs('#tmplSize').value) || 44,
+      subtitle_color: qs('#tmplColor').value,
+      aspect: qs('#tmplAspect').value,
+    });
+    toast('Template disimpan!');
+    renderTemplates();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function applyTemplate(name) {
+  try {
+    const templates = await api('GET', '/api/templates');
+    const t = templates.find(t => t.name === name);
+    if (!t) return;
+    toast(`Template "${name}" akan diterapkan di editor!`);
+    // Store template in sessionStorage for editor to pick up
+    sessionStorage.setItem('appliedTemplate', JSON.stringify(t));
+    goPage('new_clip');
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+async function deleteTemplate(name) {
+  if (!confirm(`Hapus template "${name}"?`)) return;
+  await api('DELETE', '/api/templates/' + encodeURIComponent(name));
+  loadTemplatesList();
 }
 
 // ── Navigation ─────────────────────────────────────────────
