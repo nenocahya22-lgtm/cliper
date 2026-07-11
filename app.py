@@ -462,122 +462,7 @@ def _step_moments():
             c_new, _ = st.columns(2)
             if c_new.button("➕ Buat Klip Baru", use_container_width=True, type="primary"): _reset_all(); st.rerun()
 
-# ── Step 4: Render ──────────────────────────────────────
-def _step_render():
-    res = st.session_state.get("result"); mom = st.session_state.get("sel_moment")
-    if not res or not mom: st.session_state.step = "moments"; st.rerun(); return
-    st.markdown('<div class="main-wrap">', unsafe_allow_html=True)
-    st.markdown(f'<h2 style="font-size:24px;font-weight:700;margin:0 0 4px">Render Klip</h2>', unsafe_allow_html=True)
-    st.markdown(f'<p style="color:var(--ink-soft);font-size:14px;margin:0 0 24px">{mom.category} — {mom.reason[:60]}</p>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    if res.video_path and Path(res.video_path).exists():
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            preview_path = os.path.join(st.session_state.wd, f"preview_{int(mom.start_time)}_{int(mom.end_time)}.mp4")
-            if not Path(preview_path).exists():
-                try:
-                    ffmpeg = _get_ffmpeg()
-                    subprocess.run([ffmpeg, "-y", "-ss", str(mom.start_time), "-i", res.video_path,
-                        "-t", str(min(mom.end_time - mom.start_time, 15)),
-                        "-vf", "scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2",
-                        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "30",
-                        "-c:a", "aac", "-b:a", "64k", preview_path
-                    ], capture_output=True, text=True, timeout=30)
-                except: pass
-            if Path(preview_path).exists(): st.video(preview_path)
-        with col2:
-            st.markdown(f"""
-            <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px">
-              <p style="font-size:11px;font-weight:700;color:var(--ink-soft);text-transform:uppercase;letter-spacing:0.3px;margin:0 0 8px">Info</p>
-              <p style="font-size:13px;color:#fff;margin:2px 0"><strong>Mulai:</strong> {_fmt_time(mom.start_time)}</p>
-              <p style="font-size:13px;color:#fff;margin:2px 0"><strong>Selesai:</strong> {_fmt_time(mom.end_time)}</p>
-              <p style="font-size:13px;color:#fff;margin:2px 0"><strong>Durasi:</strong> {mom.end_time - mom.start_time:.0f}s</p>
-              <p style="font-size:13px;color:#fff;margin:2px 0"><strong>Kategori:</strong> {mom.category}</p>
-            </div>
-            """, unsafe_allow_html=True)
-    else: st.info("Preview tidak tersedia.")
-    st.markdown('<hr>', unsafe_allow_html=True)
-    SubtitleGenerator, VideoProcessor, SUBTITLE_COLORS, ASPECT_PRESETS = _get_editor()
-    col_o1, col_o2, col_o3 = st.columns(3)
-    with col_o1: sub_color = st.selectbox("Warna Subtitle", list(SUBTITLE_COLORS.keys()), index=0)
-    with col_o2: aspect = st.selectbox("Aspect Ratio", list(ASPECT_PRESETS.keys()), index=0)
-    with col_o3: mirror = st.checkbox("Mirror (Horizontal)", value=True)
-    col_o4, col_o5, col_o6 = st.columns(3)
-    with col_o4: show_sub = st.checkbox("Subtitle", value=True)
-    with col_o5: speed_str = st.selectbox("Speed", ["1.0x", "1.05x", "1.1x", "1.15x"], index=0)
-    with col_o6: fade = st.checkbox("Fade In/Out", value=True)
-    st.markdown('<p style="font-size:12px;font-weight:600;color:var(--ink-soft);margin:12px 0 4px">Sesuaikan Waktu (opsional)</p>', unsafe_allow_html=True)
-    clip_dur = mom.end_time - mom.start_time
-    c_t1, c_t2 = st.columns(2)
-    with c_t1: start_val = c_t1.number_input("Mulai (detik)", 0.0, max(0.0, res.duration-5), max(0.0, mom.start_time), 0.5)
-    with c_t2: end_val = c_t2.number_input("Selesai (detik)", start_val+5, max(start_val+5, res.duration), max(start_val+5, min(start_val+clip_dur, res.duration)), 0.5)
-    col_r1, col_r2 = st.columns(2)
-    with col_r1: render_btn = st.button("🎬 Render Klip", type="primary", use_container_width=True, disabled=st.session_state.get("rendering", False))
-    with col_r2:
-        if st.button("⬅️ Kembali", use_container_width=True): st.session_state.step = "moments"; st.rerun()
-    if render_btn:
-        st.session_state.rendering = True; st.session_state.render_progress = 0.0; st.session_state.render_done = False
-        import threading
-        threading.Thread(target=_do_render, args=(start_val, end_val, show_sub, sub_color, aspect, mirror, speed_str, fade), daemon=True).start()
-    if st.session_state.get("rendering", False):
-        st.progress(st.session_state.render_progress)
-        st.markdown(f'<p style="text-align:center;font-size:13px;color:var(--ink-soft)">⏳ Merender video... {st.session_state.render_progress*100:.0f}%</p>', unsafe_allow_html=True)
-        time.sleep(0.5); st.rerun()
-    if st.session_state.get("render_done", False) and st.session_state.get("out_video"):
-        ov = st.session_state.out_video
-        if Path(ov).exists():
-            sz = Path(ov).stat().st_size / (1024*1024)
-            st.markdown(f"""<div style="text-align:center;background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.15);border-radius:16px;padding:24px;margin:16px 0"><div style="font-size:40px;margin-bottom:8px">✅</div><h3 style="font-size:20px;font-weight:700;color:#fff;margin:0 0 4px">Render Selesai!</h3><p style="font-size:13px;color:var(--ink-soft);margin:0">{os.path.basename(ov)} · {sz:.1f} MB</p></div>""", unsafe_allow_html=True)
-            st.video(str(ov))
-            with open(ov, "rb") as f:
-                st.download_button("📥 Download Video", f, file_name=os.path.basename(ov), mime="video/mp4", use_container_width=True, type="primary")
-            st.markdown('<hr>', unsafe_allow_html=True)
-
-            # Upload buttons
-            st.markdown(f'<p style="font-size:13px;font-weight:700;color:#fff;margin:0 0 8px">📤 Upload ke Platform</p>', unsafe_allow_html=True)
-            col_u1, col_u2, col_u3 = st.columns(3)
-            up_yt = col_u1.button("▶️ YouTube", use_container_width=True, disabled=st.session_state.get("_uploading", False))
-            up_tt = col_u2.button("🎵 TikTok", use_container_width=True, disabled=st.session_state.get("_uploading", False))
-            up_fb = col_u3.button("📘 Facebook", use_container_width=True, disabled=st.session_state.get("_uploading", False))
-
-            if up_yt or up_tt or up_fb:
-                plat = "youtube" if up_yt else "tiktok" if up_tt else "facebook"
-                st.session_state._uploading = True
-                try:
-                    from core.uploader import Uploader
-                    Uploader.upload(plat, ov, res.title[:100], "")
-                    st.success(f"✅ Terupload ke {plat.title()}!")
-                except Exception as e:
-                    err = str(e)
-                    if "cookies" in err.lower() or "login" in err.lower():
-                        st.warning("🔑 Belum ada cookies. Buka menu **Settings > Cookies** untuk setup.")
-                    else:
-                        st.error(f"Gagal upload: {err[:100]}")
-                st.session_state._uploading = False
-                st.rerun()
-
-            # Cookie settings
-            with st.expander("🔑 Settings Cookies (untuk Upload)"):
-                plat_sel = st.selectbox("Platform", ["youtube", "tiktok", "facebook"], key="cookie_plat")
-                cookies_txt = st.text_area("Tempel Cookies JSON", placeholder='[{ "name": "...", "value": "...", "domain": ".youtube.com", "path": "/" }]', height=100)
-                if st.button("💾 Simpan Cookies", use_container_width=True):
-                    if cookies_txt.strip():
-                        try:
-                            import json
-                            cdata = json.loads(cookies_txt.strip())
-                            if isinstance(cdata, list):
-                                from core.uploader import Uploader
-                                Uploader.save_cookies(plat_sel, cdata)
-                                st.success(f"✅ Cookies {plat_sel.title()} tersimpan!")
-                            else: st.error("Format harus array/list")
-                        except Exception as ex:
-                            st.error(f"Error: {ex}")
-
-            st.markdown('<hr>', unsafe_allow_html=True)
-            c_new, _ = st.columns(2)
-            if c_new.button("➕ Buat Klip Baru", use_container_width=True, type="primary"): _reset_all(); st.rerun()
-
-def _do_render(start_val, end_val, show_sub, sub_color, aspect, mirror, speed_str, fade):
+def _do_render(start_val, end_val, show_sub, sub_color, aspect, mirror, speed_str, fade):def _do_render(start_val, end_val, show_sub, sub_color, aspect, mirror, speed_str, fade):
     res = st.session_state.get("result")
     if not res: st.session_state.rendering = False; return
     wd = st.session_state.wd; cid = uuid.uuid4().hex[:8]
@@ -622,7 +507,6 @@ def main():
     if step == "input": _step_input()
     elif step == "processing": _step_processing()
     elif step == "moments": _step_moments()
-    elif step == "render": _step_render()
     st.markdown('<div class="main-wrap footer"><p>⚡ Cliper — Buat klip YouTube instan.</p></div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
