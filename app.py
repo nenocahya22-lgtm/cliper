@@ -229,18 +229,20 @@ def _step_input():
 
         # ── Background Music ─────────────────────────────
         st.markdown('<p style="font-size:12px;font-weight:600;color:var(--ink-soft);margin:4px 0 6px">🎵 Background Music (opsional)</p>', unsafe_allow_html=True)
-        col_b1, col_b2 = st.columns([3, 1])
+        uploaded_bgm = st.file_uploader("Pilih file MP3/WAV/M4A", type=["mp3", "wav", "m4a", "ogg"], key="bgm_upload", label_visibility="collapsed")
+        if uploaded_bgm:
+            bgm_path = os.path.join(st.session_state.wd, f"bgm_{uuid.uuid4().hex[:8]}.mp3")
+            with open(bgm_path, "wb") as f:
+                f.write(uploaded_bgm.read())
+            st.session_state.bgm_path = bgm_path
+            st.success(f"✅ BGM: {uploaded_bgm.name} siap!")
+        col_b1, col_b2 = st.columns(2)
         with col_b1:
-            uploaded_bgm = st.file_uploader("Pilih file MP3", type=["mp3", "wav", "m4a", "ogg"], key="bgm_upload", label_visibility="collapsed")
-            if uploaded_bgm:
-                bgm_path = os.path.join(st.session_state.wd, f"bgm_{uuid.uuid4().hex[:8]}.mp3")
-                with open(bgm_path, "wb") as f:
-                    f.write(uploaded_bgm.read())
-                st.session_state.bgm_path = bgm_path
-                st.success(f"✅ BGM: {uploaded_bgm.name} siap!")
-        with col_b2:
-            bgm_vol = st.slider("Volume BGM", 0, 100, st.session_state.get("bgm_volume", 30), 5, key="bgm_vol_input")
+            bgm_vol = st.slider("🎵 Volume BGM", 0, 100, st.session_state.get("bgm_volume", 30), 5, key="bgm_vol_input")
             st.session_state.bgm_volume = bgm_vol
+        with col_b2:
+            orig_vol = st.slider("🔊 Volume Audio Asli", 0, 100, st.session_state.get("original_volume", 100), 5, key="orig_vol_input")
+            st.session_state.original_volume = orig_vol
 
         # ── Cookies.txt upload (bypass YouTube 403) ────
         with st.expander("🍪 Cookies YouTube (bypass 403)"):
@@ -539,7 +541,8 @@ def _step_moments():
         import threading
         bgm_path = st.session_state.get("bgm_path", "")
         bgm_vol = st.session_state.get("bgm_volume", 30) / 100.0
-        threading.Thread(target=_do_render, args=(start_val, end_val, show_sub, sub_color, aspect, mirror, speed_str, fade, bgm_path, bgm_vol), daemon=True).start()
+        orig_vol = st.session_state.get("original_volume", 100) / 100.0
+        threading.Thread(target=_do_render, args=(start_val, end_val, show_sub, sub_color, aspect, mirror, speed_str, fade, bgm_path, bgm_vol, orig_vol), daemon=True).start()
         st.rerun()
 
     if st.session_state.get("rendering", False):
@@ -600,7 +603,7 @@ def _step_moments():
             c_new, _ = st.columns(2)
             if c_new.button("➕ Buat Klip Baru", use_container_width=True, type="primary"): _reset_all(); st.rerun()
 
-def _do_render(start_val, end_val, show_sub, sub_color, aspect, mirror, speed_str, fade, bgm_path="", bgm_vol=0.3):
+def _do_render(start_val, end_val, show_sub, sub_color, aspect, mirror, speed_str, fade, bgm_path="", bgm_vol=0.3, orig_vol=1.0):
     res = st.session_state.get("result")
     if not res: st.session_state.rendering = False; return
     wd = st.session_state.wd; cid = uuid.uuid4().hex[:8]
@@ -627,7 +630,8 @@ def _do_render(start_val, end_val, show_sub, sub_color, aspect, mirror, speed_st
         ok, err = VideoProcessor.process_clip(clip_path, out, sub_path if Path(sub_path).exists() else "", "",
             0, end_val - start_val, fi, fo, speed, mirror, "none", True, aspect=aspect,
             bg_music=bgm_path if bgm_path and Path(bgm_path).exists() else "",
-            music_volume=bgm_vol)
+            music_volume=bgm_vol,
+            original_volume=orig_vol)
         if not ok: raise Exception(err)
         st.session_state.render_progress = 0.8
         safe_title = "".join(c if c.isalnum() or c in " _-" else "_" for c in res.title)[:30]

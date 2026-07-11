@@ -434,8 +434,8 @@ class VideoProcessor:
                      sharpen: bool=False, edge_detect: bool=False,
                      transition: str="none", text_overlay: str="",
                      text_animation: str="none", bg_music: str="",
-                     music_volume: float=0.3, pip_video: str="",
-                     speed_ramp: str="none", glitch: bool=False,
+                     music_volume: float=0.3, original_volume: float=1.0,
+                     pip_video: str="", speed_ramp: str="none", glitch: bool=False,
                      subtitle_animation: str="none",
                      # ── New CapCut Features ────────────────────────
                      reverse: bool=False,
@@ -673,11 +673,18 @@ class VideoProcessor:
 
         if bg_music and Path(bg_music).exists():
             af = ",".join(audio_filters) if audio_filters else "anull"
+            if original_volume != 1.0:
+                af = f"{af},volume={original_volume}"
             final_af = f"{bg_music_input}[0:a]{af}[main_a];[main_a][bga]amix=inputs=2:duration=first[outa]"
             cmd += ["-filter_complex", final_filter + ";" + final_af]
             cmd += ["-map", "[outa]"]
-        elif audio_filters:
-            cmd += ["-af", ",".join(audio_filters)]
+        else:
+            if audio_filters:
+                if original_volume != 1.0:
+                    audio_filters.append(f"volume={original_volume}")
+                cmd += ["-af", ",".join(audio_filters)]
+            elif original_volume != 1.0:
+                cmd += ["-af", f"volume={original_volume}"]
 
         cmd += ["-c:v", "libx264", "-preset", "fast", "-crf", "23",
                 "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", out]
