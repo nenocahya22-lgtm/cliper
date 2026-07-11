@@ -462,7 +462,7 @@ def _step_moments():
             c_new, _ = st.columns(2)
             if c_new.button("➕ Buat Klip Baru", use_container_width=True, type="primary"): _reset_all(); st.rerun()
 
-def _do_render(start_val, end_val, show_sub, sub_color, aspect, mirror, speed_str, fade):def _do_render(start_val, end_val, show_sub, sub_color, aspect, mirror, speed_str, fade):
+def _do_render(start_val, end_val, show_sub, sub_color, aspect, mirror, speed_str, fade):
     res = st.session_state.get("result")
     if not res: st.session_state.rendering = False; return
     wd = st.session_state.wd; cid = uuid.uuid4().hex[:8]
